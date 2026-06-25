@@ -1,0 +1,38 @@
+{
+  "id": "hd48",
+  "district_code": "048",
+  "district_label": "House District 48",
+  "chamber": "state_house",
+  "candidate": "Mark DeCaprio",
+  "party": "R",
+  "posture": "defense",
+  "headline": "HD 48 · DeCaprio",
+  "tagline": "General-election defense — Colchester, Lebanon, Bozrah & Franklin",
+  "accent": "#B23A2E",
+  "accent_soft": "#E7C3BD",
+  "accent_deep": "#7E2A22",
+  "core_towns": ["Colchester", "Lebanon", "Bozrah", "Franklin"],
+  "town_aliases": {
+    "Colchestor": "Colchester",
+    "Westchester": "Colchester",
+    "Gilman": "Bozrah",
+    "Fitchville": "Bozrah",
+    "North Franklin": "Franklin",
+    "Frankin": "Franklin",
+    "Frankln": "Franklin",
+    "Fra": "Franklin",
+    "Franklkin": "Franklin"
+  },
+  "posture_copy": {
+    "mission": "Protect an incumbent Republican seat across four eastern Connecticut towns.",
+    "frame": "Defense",
+    "primary_metric": "Republican performance to protect",
+    "questions": [
+      "Where is DeCaprio strongest, and where is the seat most exposed?",
+      "Which towns and precincts need turnout protection?",
+      "Where are unaffiliated voters concentrated enough to expand margin?",
+      "Where do Republicans underperform their registration share?"
+    ]
+  },
+  "newly_registered_since": "2024-11-06"
+}

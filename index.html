@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Campaign Intelligence</title>
+<link rel="stylesheet" href="assets/leaflet.css" />
+<style>
+:root{
+  --bg:#0d131f; --shell:#0f1726; --shell-2:#12203a; --line:#22304a;
+  --panel:#ffffff; --panel-2:#f5f7fa; --ink:#101725; --ink-2:#465065;
+  --ink-3:#79839a; --hair:#e6e9ef; --hair-2:#eef1f6;
+  --accent:#B23A2E; --accent-soft:#E7C3BD; --accent-deep:#7E2A22;
+  --r:#C2403B; --d:#2F6FB0; --u:#6b7689; --m:#B0883B;
+  --good:#2f9e6f; --warn:#c98a23; --bad:#c2433b;
+  --radius:9px; --shadow:0 1px 2px rgba(16,23,37,.06),0 6px 22px -12px rgba(16,23,37,.18);
+  --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:var(--sans);background:var(--panel-2);color:var(--ink);
+  -webkit-font-smoothing:antialiased;font-size:14px;line-height:1.45}
+a{color:inherit;text-decoration:none}
+.app{display:grid;grid-template-columns:248px 1fr;min-height:100vh}
+/* ---------- sidebar ---------- */
+.side{background:var(--shell);color:#c7d2e4;display:flex;flex-direction:column;
+  position:sticky;top:0;height:100vh;border-right:1px solid #060b14}
+.brand{padding:20px 20px 16px;border-bottom:1px solid var(--line)}
+.brand .kicker{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3)}
+.brand .name{font-size:18px;font-weight:700;color:#fff;margin-top:5px;letter-spacing:-.01em}
+.brand .sub{font-size:11.5px;color:#8896ad;margin-top:4px;line-height:1.4}
+.brand .pill{display:inline-flex;align-items:center;gap:6px;margin-top:11px;font-size:10.5px;
+  font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:4px 9px;border-radius:999px;
+  background:color-mix(in srgb,var(--accent) 26%,transparent);color:#fff;
+  border:1px solid color-mix(in srgb,var(--accent) 55%,transparent)}
+nav{padding:12px 12px;flex:1;overflow:auto}
+.nav-sec{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#5d6a83;
+  padding:14px 10px 6px}
+.nav a{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:7px;
+  color:#aeb9cd;font-size:13.5px;font-weight:500;margin-bottom:1px;cursor:pointer;
+  border:1px solid transparent}
+.nav a .ic{width:16px;height:16px;flex:none;opacity:.8}
+.nav a:hover{background:#16223a;color:#fff}
+.nav a.active{background:linear-gradient(90deg,color-mix(in srgb,var(--accent) 22%,transparent),transparent);
+  color:#fff;border-color:var(--line)}
+.nav a.active .ic{opacity:1;color:var(--accent)}
+.side-foot{padding:14px 18px;border-top:1px solid var(--line);font-size:11px;color:#6f7c94}
+.switch{display:flex;gap:6px;margin-bottom:10px}
+.switch a{flex:1;text-align:center;padding:7px 6px;border-radius:7px;font-size:11.5px;font-weight:600;
+  background:#0c1422;border:1px solid var(--line);color:#9aa7bd}
+.switch a.on{background:var(--accent);border-color:var(--accent);color:#fff}
+/* ---------- main ---------- */
+.main{min-width:0;display:flex;flex-direction:column}
+.topbar{display:flex;align-items:center;gap:16px;padding:0 28px;height:60px;
+  background:rgba(255,255,255,.86);backdrop-filter:blur(8px);border-bottom:1px solid var(--hair);
+  position:sticky;top:0;z-index:40}
+.topbar h1{font-size:15px;font-weight:650;margin:0;letter-spacing:-.01em}
+.topbar .crumb{font-size:12px;color:var(--ink-3)}
+.topbar .spacer{flex:1}
+.badge{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;color:var(--ink-2);
+  background:var(--panel-2);border:1px solid var(--hair);padding:6px 11px;border-radius:999px}
+.badge .dot{width:7px;height:7px;border-radius:50%;background:var(--good)}
+.view{padding:26px 28px 60px;max-width:1320px;width:100%}
+/* ---------- page head ---------- */
+.pagehead{margin-bottom:22px}
+.pagehead h2{font-size:23px;font-weight:700;letter-spacing:-.02em;margin:0 0 5px}
+.pagehead p{margin:0;color:var(--ink-2);font-size:13.5px;max-width:70ch}
+/* ---------- primitives ---------- */
+.card{background:var(--panel);border:1px solid var(--hair);border-radius:var(--radius);box-shadow:var(--shadow)}
+.card.pad{padding:18px 20px}
+.grid{display:grid;gap:16px}
+.section-title{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);
+  font-weight:650;margin:0 0 12px;display:flex;align-items:center;gap:10px}
+.section-title .ln{flex:1;height:1px;background:var(--hair)}
+/* KPI */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.kpi{background:var(--panel);border:1px solid var(--hair);border-radius:var(--radius);
+  padding:15px 16px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.kpi .lab{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-3);font-weight:600}
+.kpi .val{font-size:26px;font-weight:720;letter-spacing:-.02em;margin-top:7px;font-variant-numeric:tabular-nums}
+.kpi .sub{font-size:11.5px;color:var(--ink-2);margin-top:3px}
+.kpi .bar{position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
+.kpi.r .bar{background:var(--r)} .kpi.d .bar{background:var(--d)}
+.kpi.u .bar{background:var(--u)} .kpi.m .bar{background:var(--m)}
+/* tables */
+.tbl-wrap{overflow:auto;border:1px solid var(--hair);border-radius:var(--radius);background:#fff}
+table{border-collapse:collapse;width:100%;font-size:13px}
+thead th{position:sticky;top:0;background:#fafbfd;text-align:left;font-size:11px;letter-spacing:.03em;
+  text-transform:uppercase;color:var(--ink-3);font-weight:650;padding:10px 12px;border-bottom:1px solid var(--hair);
+  white-space:nowrap;cursor:pointer;user-select:none}
+thead th.num{text-align:right}
+thead th .ar{opacity:.4;font-size:9px;margin-left:3px}
+tbody td{padding:9px 12px;border-bottom:1px solid var(--hair-2);font-variant-numeric:tabular-nums;white-space:nowrap}
+tbody td.num{text-align:right}
+tbody tr:hover{background:#f8fafc}
+tbody tr.click{cursor:pointer}
+td .nm{font-weight:600}
+.t-r{color:var(--r)} .t-d{color:var(--d)} .t-u{color:var(--u)}
+.mini{height:6px;border-radius:4px;background:var(--hair);overflow:hidden;min-width:60px;display:inline-block;vertical-align:middle}
+.mini > i{display:block;height:100%;background:var(--accent)}
+/* chips / tags */
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;
+  background:var(--panel-2);border:1px solid var(--hair);color:var(--ink-2)}
+.chip.solid{background:var(--accent);color:#fff;border-color:var(--accent)}
+.tag-Protect,.tag-Build.base{background:#e7f3ec;color:#1e7a4e;border-color:#bfe2cd}
+.tag-Turnout.opportunity{background:#fdf2e2;color:#9a6516;border-color:#f0d8ad}
+.tag-Persuasion.opportunity{background:#eaf1fb;color:#27568f;border-color:#cbdcf3}
+.tag-Field-development.opportunity,.tag-Hold.the.line{background:#f1f0f4;color:#534a63;border-color:#ddd9e6}
+.tag-Long.shot,.tag-Data-gap.area{background:#f6eceb;color:#9a3f38;border-color:#ecccc8}
+/* legend */
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--ink-2)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+/* controls */
+.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+select,input[type=text],input[type=number]{font-family:inherit;font-size:13px;padding:8px 10px;
+  border:1px solid var(--hair);border-radius:7px;background:#fff;color:var(--ink);min-width:0}
+select:focus,input:focus{outline:2px solid color-mix(in srgb,var(--accent) 40%,transparent);outline-offset:0;border-color:var(--accent)}
+label.fld{display:flex;flex-direction:column;gap:5px;font-size:11px;font-weight:600;color:var(--ink-2);
+  text-transform:uppercase;letter-spacing:.03em}
+.btn{font-family:inherit;font-size:13px;font-weight:600;padding:9px 15px;border-radius:7px;cursor:pointer;
+  border:1px solid var(--hair);background:#fff;color:var(--ink);display:inline-flex;align-items:center;gap:7px}
+.btn:hover{background:var(--panel-2)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.pri:hover{background:var(--accent-deep)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.toggle{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--ink);cursor:pointer;
+  padding:7px 11px;border:1px solid var(--hair);border-radius:7px;background:#fff;font-weight:500}
+.toggle input{accent-color:var(--accent)}
+/* narrative */
+.narr{background:linear-gradient(180deg,#fff, #fcfdff);border:1px solid var(--hair);border-left:3px solid var(--accent);
+  border-radius:var(--radius);padding:18px 22px;box-shadow:var(--shadow)}
+.narr h3{margin:0 0 8px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px}
+.narr p{margin:0 0 9px;font-size:13.5px;color:var(--ink-2);line-height:1.6}
+.narr b{color:var(--ink)}
+/* drilldown drawer */
+.drawer{position:fixed;top:0;right:0;height:100vh;width:430px;max-width:92vw;background:#fff;
+  box-shadow:-12px 0 40px -18px rgba(16,23,37,.4);border-left:1px solid var(--hair);z-index:80;
+  transform:translateX(100%);transition:transform .22s ease;display:flex;flex-direction:column}
+.drawer.open{transform:none}
+.drawer .dh{padding:18px 22px;border-bottom:1px solid var(--hair);display:flex;justify-content:space-between;align-items:start}
+.drawer .db{padding:20px 22px;overflow:auto}
+.drawer .x{cursor:pointer;color:var(--ink-3);font-size:20px;line-height:1}
+.scrim{position:fixed;inset:0;background:rgba(13,19,31,.32);z-index:70;opacity:0;pointer-events:none;transition:opacity .2s}
+.scrim.open{opacity:1;pointer-events:auto}
+/* empty / note */
+.empty{text-align:center;padding:46px 24px;color:var(--ink-2)}
+.empty .ic{font-size:30px;opacity:.4}
+.empty h3{margin:12px 0 6px;font-size:16px;color:var(--ink)}
+.note{display:flex;gap:11px;padding:13px 15px;border-radius:8px;background:#fbf4e9;border:1px solid #f0ddb8;
+  color:#7a5a17;font-size:12.5px}
+.note.info{background:#eef3fb;border-color:#cfddf2;color:#2c5183}
+/* stat lines */
+.dl{display:grid;grid-template-columns:auto 1fr;gap:8px 16px;font-size:13px}
+.dl dt{color:var(--ink-3);font-weight:500}
+.dl dd{margin:0;text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
+.coverbar{display:flex;align-items:center;gap:10px}
+.coverbar .track{flex:1;height:8px;border-radius:5px;background:var(--hair);overflow:hidden}
+.coverbar .track > i{display:block;height:100%;border-radius:5px}
+.muted{color:var(--ink-3)}
+.right{text-align:right} .center{text-align:center}
+.hl{font-weight:700}
+canvas{max-width:100%}
+#map{height:460px;border-radius:var(--radius);border:1px solid var(--hair);z-index:1}
+.flex{display:flex;gap:16px} .col{display:flex;flex-direction:column;gap:16px}
+.between{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.scorebar{height:7px;border-radius:5px;background:var(--hair);overflow:hidden;margin-top:5px}
+.scorebar > i{display:block;height:100%}
+@media(max-width:980px){.app{grid-template-columns:1fr}.side{position:fixed;left:-260px;z-index:90;transition:left .2s}
+  .side.show{left:0}.kpis{grid-template-columns:repeat(2,1fr)} .menu-btn{display:inline-flex!important}}
+.menu-btn{display:none}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side" id="side">
+    <div class="brand">
+      <div class="kicker" id="b-kicker">Campaign Intelligence</div>
+      <div class="name" id="b-name">—</div>
+      <div class="sub" id="b-sub"></div>
+      <div class="pill" id="b-pill"></div>
+    </div>
+    <nav id="nav" class="nav"></nav>
+    <div class="side-foot">
+      <div class="switch" id="switch"></div>
+      <div id="b-gen"></div>
+    </div>
+  </aside>
+  <div class="main">
+    <div class="topbar">
+      <button class="btn menu-btn" onclick="document.getElementById('side').classList.toggle('show')">☰</button>
+      <h1 id="t-title">Overview</h1>
+      <span class="crumb" id="t-crumb"></span>
+      <div class="spacer"></div>
+      <span class="badge"><span class="dot"></span><span id="t-source">SOTS voter file</span></span>
+    </div>
+    <div class="view" id="view"></div>
+  </div>
+</div>
+<div class="scrim" id="scrim" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="dh"><div id="dr-h"></div><div class="x" onclick="closeDrawer()">×</div></div>
+  <div class="db" id="dr-b"></div>
+</div>
+
+<script src="assets/leaflet.js"></script>
+<script src="assets/chart.umd.min.js"></script>
+<script src="assets/xlsx.full.min.js"></script>
+<script src="data/meta.js"></script>
+<script src="data/voters.js"></script>
+<script src="data/towns.js"></script>
+<script src="data/precincts.js"></script>
+<script src="data/health.js"></script>
+<script src="data/geometry.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
