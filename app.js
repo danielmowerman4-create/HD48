@@ -74,57 +74,24 @@ const gridY = { grid: { color: "rgba(255,255,255,.05)" }, border: { display: fal
 /* ============================ OVERVIEW ============================ */
 ROUTES.overview = function (view) {
   pageHead(view, C.candidate + " — District Snapshot",
-    C.posture_copy.mission + " Every figure is an aggregate of the registered voter file — no individual voter records are shown.");
+    "An aggregate snapshot of the registered voter file. No individual voter records are shown.");
 
-  // core registration KPIs
+  // four core registration numbers
   const k = el("div", "kpis");
-  kpi(k, "Active voters", fmt(T.active), `${fmt(T.registered)} registered · ${fmt(T.inactive)} inactive`);
+  kpi(k, "Active voters", fmt(T.active), `${fmt(T.registered)} registered`);
   kpi(k, "Republican", fmt(T.party.Republican), pc1(T.party_pct.Republican) + " of active", "r");
   kpi(k, "Unaffiliated", fmt(T.party.Unaffiliated), pc1(T.party_pct.Unaffiliated) + " of active", "u");
   kpi(k, "Democratic", fmt(T.party.Democratic), pc1(T.party_pct.Democratic) + " of active", "d");
   view.appendChild(k);
 
-  // turnout-shape KPIs
-  const k2 = el("div", "kpis"); k2.style.marginTop = "16px";
-  kpi(k2, "High-turnout voters", fmt(T.high_turnout), "5+ vote score", "gold");
-  kpi(k2, C.posture === "defense" ? "Low-prop / persuadable" : "Low-prop opportunity",
-    fmt(T.low_prop_high_opp), "lowest tier — reactivation room", "teal");
-  kpi(k2, "Newly registered", fmt(T.newly_registered), "since last election", "teal");
-  kpi(k2, "Towns · Precincts", `${T.towns} · ${T.precincts}`, "in the district");
-  view.appendChild(k2);
+  // one clean party-balance bar (replaces the bar chart + legend)
+  view.appendChild(partyBar());
 
-  // composition + narrative
-  const row = el("div", "grid"); row.style.gridTemplateColumns = "1.35fr 1fr"; row.style.marginTop = "20px";
-  const left = el("div", "card pad");
-  left.appendChild(el("p", "section-title", "Party composition of active voters<span class='ln'></span>"));
-  chart(left, {
-    type: "bar",
-    data: {
-      labels: PARTY.map(shortP),
-      datasets: [{ data: PARTY.map(p => T.party[p]), backgroundColor: PARTY.map(p => PCOL[p]), borderRadius: 4, maxBarThickness: 64 }]
-    },
-    options: { plugins: { legend: { display: false } }, scales: { x: gridX, y: gridY }, maintainAspectRatio: false }
-  }, 210);
-  const leg = el("div", "legend"); leg.style.marginTop = "10px";
-  leg.innerHTML = PARTY.map(p => `<span><i style="background:${PCOL[p]}"></i>${shortP(p)} ${pc1(T.party_pct[p])}</span>`).join("");
-  left.appendChild(leg);
-  row.appendChild(left); row.appendChild(narrative());
-  view.appendChild(row);
-
-  // turnout + method
-  const row2 = el("div", "grid"); row2.style.gridTemplateColumns = "1fr 1fr"; row2.style.marginTop = "18px";
-  const tc = el("div", "card pad");
-  tc.appendChild(el("p", "section-title", "Turnout tiers<span class='ln'></span>"));
-  chart(tc, doughnut(TIERS.map(t => T.tier[t]), TIERS, ["#34D399", "#1A8B9A", "#F0B82A", "#5A6E80"]), 190);
-  const mc = el("div", "card pad");
-  mc.appendChild(el("p", "section-title", "Vote-method tendency<span class='ln'></span>"));
-  chart(mc, doughnut(METHODS.map(m => T.method[m]), ["Early", "Absentee", "Election Day", "Mixed", "Unknown"],
-    ["#3A6AB8", "#60A5FA", "#E05555", "#F0B82A", "#5A6E80"]), 190);
-  row2.appendChild(tc); row2.appendChild(mc);
-  view.appendChild(row2);
+  // the strategic takeaway
+  view.appendChild(narrative());
 
   // towns at a glance
-  const tlist = el("div", "card"); tlist.style.marginTop = "18px";
+  const tlist = el("div", "card"); tlist.style.marginTop = "22px";
   const head = el("div", "pad between"); head.style.paddingBottom = "0";
   head.innerHTML = `<p class="section-title" style="margin:0">Towns at a glance</p><a class="chip" href="#geography">Open geography →</a>`;
   tlist.appendChild(head);
@@ -132,13 +99,31 @@ ROUTES.overview = function (view) {
   view.appendChild(tlist);
 };
 
+function partyBar() {
+  const segs = [["Republican", "r"], ["Unaffiliated", "u"], ["Democratic", "d"], ["Minor / Other", "o"]];
+  const card = el("div", "card pad"); card.style.marginTop = "22px";
+  card.appendChild(el("p", "section-title", "Party balance of active voters<span class='ln'></span>"));
+  const bar = el("div", "pbar");
+  bar.innerHTML = segs.map(([p, c]) => {
+    const w = T.party_pct[p];
+    const inner = w >= 6 ? `<span>${c === "o" ? "Other" : shortP(p)}</span><b>${pc1(w)}</b>` : "";
+    return `<div class="pbar-seg ${c}" style="width:${w}%">${inner}</div>`;
+  }).join("");
+  card.appendChild(bar);
+  const lg = el("div", "pbar-legend");
+  lg.innerHTML = segs.map(([p, c]) =>
+    `<div class="it"><i class="${c}"></i><div><b>${fmt(T.party[p])}</b> <span class="muted">${c === "o" ? "Other" : shortP(p)}</span></div></div>`).join("");
+  card.appendChild(lg);
+  return card;
+}
+
 function narrative() {
   const tw = townList();
   const rShare = T.party_pct.Republican, uShare = T.party_pct.Unaffiliated, dShare = T.party_pct.Democratic;
   const byR = [...tw].sort((x, y) => y.party_pct.Republican - x.party_pct.Republican);
   const topR = byR[0], lowR = byR[byR.length - 1];
   const byU = [...tw].sort((x, y) => y.party_pct.Unaffiliated - x.party_pct.Unaffiliated)[0];
-  const card = el("div", "narr");
+  const card = el("div", "narr"); card.style.marginTop = "22px";
   let html = `<h3>📍 What the district is telling us</h3>`;
   if (C.posture === "defense") {
     html += `<p>Across ${tw.length} towns the active universe is <b>${pc1(rShare)} Republican</b>, <b>${pc1(dShare)} Democratic</b>, and <b>${pc1(uShare)} unaffiliated</b>. Registration alone is close, so the seat is held on turnout and unaffiliated margin, not party share.</p>`;
@@ -201,25 +186,7 @@ ROUTES.geography = function (view) {
     view.appendChild(note);
   }
 
-  // town comparison chart
-  const cc = el("div", "card pad"); cc.style.marginTop = "18px";
-  cc.appendChild(el("p", "section-title", "Towns ranked by Republican vs Unaffiliated share<span class='ln'></span>"));
-  const tw = townList();
-  chart(cc, {
-    type: "bar",
-    data: {
-      labels: tw.map(t => t.name),
-      datasets: [
-        { label: "Republican", data: tw.map(t => t.party_pct.Republican), backgroundColor: PCOL.Republican, borderRadius: 3 },
-        { label: "Unaffiliated", data: tw.map(t => t.party_pct.Unaffiliated), backgroundColor: PCOL.Unaffiliated, borderRadius: 3 },
-        { label: "Democratic", data: tw.map(t => t.party_pct.Democratic), backgroundColor: PCOL.Democratic, borderRadius: 3 },
-      ]
-    },
-    options: { plugins: { legend: { position: "bottom", labels: { boxWidth: 10 } } }, scales: { x: gridX, y: { ...gridY, ticks: { callback: v => v + "%" } } }, maintainAspectRatio: false }
-  }, Math.max(200, tw.length * 14 + 120));
-  view.appendChild(cc);
-
-  view.appendChild(sectionCard("Towns", rankTable(tw, "town")));
+  view.appendChild(sectionCard("Towns", rankTable(townList(), "town")));
   view.appendChild(sectionCard("Precincts", rankTable(precList(), "precinct")));
 };
 
@@ -324,21 +291,32 @@ ROUTES.turnout = function (view) {
   pageHead(view, "Turnout History",
     "Participation reconstructed from the SOTS vote record of today’s registered voters. This is a turnout signal — not a record of how anyone voted, which is secret.");
 
-  const card = el("div", "card pad");
+  // turnout-shape KPIs
+  const k = el("div", "kpis"); k.style.gridTemplateColumns = "repeat(3,1fr)";
+  kpi(k, "High-turnout voters", fmt(T.high_turnout), "5+ vote score", "gold");
+  kpi(k, "Low / none tier", fmt(T.tier.Low + T.tier.None), "reactivation room", "teal");
+  kpi(k, "Newly registered", fmt(T.newly_registered), "since last election", "teal");
+  view.appendChild(k);
+
+  // participation timeline
+  const card = el("div", "card pad"); card.style.marginTop = "22px";
   card.appendChild(el("p", "section-title", "Ballots cast by current registrants — general vs primary<span class='ln'></span>"));
   partTimeline(card, 280);
   card.appendChild(el("div", "note info",
     "<span>ℹ️</span><div>Counts reflect people <b>currently registered</b> in the district who cast a ballot in each year. Recent cycles look larger partly because more of today’s voters were registered then. Treat as a relative turnout gauge.</div>"));
   view.appendChild(card);
 
-  const tcard = el("div", "card pad"); tcard.style.marginTop = "18px";
-  tcard.appendChild(el("p", "section-title", "Turnout-tier composition of the active universe<span class='ln'></span>"));
-  chart(tcard, {
-    type: "bar",
-    data: { labels: TIERS, datasets: [{ data: TIERS.map(t => T.tier[t]), backgroundColor: ["#34D399", "#1A8B9A", "#F0B82A", "#5A6E80"], borderRadius: 4, maxBarThickness: 70 }] },
-    options: { indexAxis: "y", plugins: { legend: { display: false } }, scales: { x: gridY, y: gridX }, maintainAspectRatio: false }
-  }, 180);
-  view.appendChild(tcard);
+  // turnout tiers + vote method
+  const row = el("div", "grid"); row.style.gridTemplateColumns = "1fr 1fr"; row.style.marginTop = "22px";
+  const tc = el("div", "card pad");
+  tc.appendChild(el("p", "section-title", "Turnout tiers<span class='ln'></span>"));
+  chart(tc, doughnut(TIERS.map(t => T.tier[t]), TIERS, ["#34D399", "#1A8B9A", "#F0B82A", "#5A6E80"]), 200);
+  const mc = el("div", "card pad");
+  mc.appendChild(el("p", "section-title", "Vote-method tendency<span class='ln'></span>"));
+  chart(mc, doughnut(METHODS.map(m => T.method[m]), ["Early", "Absentee", "Election Day", "Mixed", "Unknown"],
+    ["#3A6AB8", "#60A5FA", "#E05555", "#F0B82A", "#5A6E80"]), 200);
+  row.appendChild(tc); row.appendChild(mc);
+  view.appendChild(row);
 };
 
 /* ============================ DRILL-DOWN (aggregate) ============================ */
