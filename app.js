@@ -6,20 +6,19 @@
 const C = window.CAMPAIGN, V = window.VOTERS, TOWNS = window.TOWN_SUMMARY,
       PREC = window.PRECINCT_SUMMARY, HEALTH = window.DATA_HEALTH, GEO = window.GEOMETRY;
 const PARTY = ["Republican", "Democratic", "Unaffiliated", "Minor / Other"];
-const PCOL = { "Republican": "#C2403B", "Democratic": "#2F6FB0", "Unaffiliated": "#6b7689", "Minor / Other": "#B0883B" };
+const PCOL = { "Republican": "#E05555", "Democratic": "#3A6AB8", "Unaffiliated": "#5A6E80", "Minor / Other": "#D4A017" };
 const TIERS = ["High", "Medium", "Low", "None"];
 const METHODS = ["Likely Early Vote", "Likely Absentee", "Likely Election Day", "Mixed Method", "Unknown"];
 
 /* ---- apply campaign identity ---- */
 const root = document.documentElement.style;
-root.setProperty("--accent", C.accent);
-root.setProperty("--accent-soft", C.accent_soft);
-root.setProperty("--accent-deep", C.accent_deep);
-document.title = C.headline + " · Campaign Intelligence";
+root.setProperty("--camp", C.accent || "#22AABC");
+document.title = C.headline + " · DM Strategies";
+document.getElementById("h-title").innerHTML = "<b>" + C.headline + "</b>";
 document.getElementById("b-name").textContent = C.district_label;
 document.getElementById("b-sub").textContent = C.candidate + " · " + (C.posture === "defense" ? "Incumbent defense" : "Open-seat pickup");
 document.getElementById("b-pill").textContent = C.posture_copy.frame;
-document.getElementById("b-gen").textContent = "Generated " + C.generated_at.replace("T", " ");
+document.getElementById("b-gen").textContent = "Updated " + C.generated_at.replace("T", " · ").slice(0, 21);
 
 /* campaign switcher (separate repos, separate ports) */
 const SWITCH = [
@@ -57,12 +56,11 @@ const NAV = [
 ];
 function buildNav() {
   const n = $("#nav");
-  n.appendChild(el("div", "nav-sec", "Workspace"));
-  NAV.forEach(([id, lab, d]) => {
-    const a = el("a"); a.dataset.route = id;
-    a.innerHTML = `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="${d}"/></svg><span>${lab}</span>`;
-    a.onclick = () => location.hash = id;
-    n.appendChild(a);
+  NAV.forEach(([id, lab]) => {
+    const t = el("div", "tab"); t.dataset.route = id;
+    t.innerHTML = `<span class="tab-pip"></span>${lab}`;
+    t.onclick = () => location.hash = id;
+    n.appendChild(t);
   });
 }
 
@@ -70,12 +68,11 @@ function buildNav() {
 const ROUTES = {};
 function route() {
   const r = (location.hash.replace("#", "") || "overview").split("/")[0];
-  document.querySelectorAll(".nav a").forEach(a => a.classList.toggle("active", a.dataset.route === r));
+  document.querySelectorAll(".tab").forEach(a => a.classList.toggle("active", a.dataset.route === r));
   const meta = NAV.find(x => x[0] === r) || NAV[0];
   $("#t-title").textContent = meta[1];
   $("#view").innerHTML = ""; window._charts && window._charts.forEach(c => c.destroy()); window._charts = [];
   (ROUTES[r] || ROUTES.overview)($("#view"));
-  document.getElementById("side").classList.remove("show");
   window.scrollTo(0, 0);
 }
 window.addEventListener("hashchange", route);
@@ -84,12 +81,12 @@ window.addEventListener("hashchange", route);
 function chart(parent, cfg, h) {
   const wrap = el("div"); wrap.style.height = (h || 220) + "px"; wrap.style.position = "relative";
   const cv = el("canvas"); wrap.appendChild(cv); parent.appendChild(wrap);
-  Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
-  Chart.defaults.font.size = 12; Chart.defaults.color = "#465065";
+  Chart.defaults.font.family = "'Outfit',system-ui,sans-serif";
+  Chart.defaults.font.size = 12; Chart.defaults.color = "#6B87A3";
   window._charts.push(new Chart(cv, cfg));
 }
 const gridX = { grid: { display: false }, ticks: { autoSkip: false } };
-const gridY = { grid: { color: "#eef1f6" }, border: { display: false }, ticks: { precision: 0 } };
+const gridY = { grid: { color: "rgba(255,255,255,.05)" }, border: { display: false }, ticks: { precision: 0 } };
 
 /* ============================ OVERVIEW ============================ */
 ROUTES.overview = function (view) {
@@ -105,11 +102,11 @@ ROUTES.overview = function (view) {
   kpi(k, "Democratic", fmt(T.party.Democratic), pc1(T.party_pct.Democratic) + " of active", "d");
   view.appendChild(k);
   const k2 = el("div", "kpis"); k2.style.marginTop = "14px";
-  kpi(k2, "Walk-list universe", fmt(T.walk_universe), "active w/ mailing address");
-  kpi(k2, "High-turnout voters", fmt(T.high_turnout), "5+ vote score");
+  kpi(k2, "Walk-list universe", fmt(T.walk_universe), "active w/ mailing address", "teal");
+  kpi(k2, "High-turnout voters", fmt(T.high_turnout), "5+ vote score", "gold");
   kpi(k2, C.posture === "defense" ? "Low-prop / persuadable" : "Low-prop opportunity",
     fmt(T.low_prop_high_opp), "1-vote tier — reactivation room");
-  kpi(k2, "Towns · Precincts", `${T.towns} · ${T.precincts}`, fmt(T.newly_registered) + " newly registered");
+  kpi(k2, "Towns · Precincts", `${T.towns} · ${T.precincts}`, fmt(T.newly_registered) + " newly registered", "teal");
   view.appendChild(k2);
 
   // two-column: composition charts + narrative
@@ -136,11 +133,11 @@ ROUTES.overview = function (view) {
   const row2 = el("div", "grid"); row2.style.gridTemplateColumns = "1fr 1fr 1.3fr"; row2.style.marginTop = "18px";
   const tc = el("div", "card pad");
   tc.appendChild(el("p", "section-title", "Turnout tiers<span class='ln'></span>"));
-  chart(tc, doughnut(TIERS.map(t => T.tier[t]), TIERS, ["#2f9e6f", "#7bb37e", "#cdb24a", "#c9ccd4"]), 180);
+  chart(tc, doughnut(TIERS.map(t => T.tier[t]), TIERS, ["#34D399", "#1A8B9A", "#F0B82A", "#5A6E80"]), 180);
   const mc = el("div", "card pad");
   mc.appendChild(el("p", "section-title", "Vote-method tendency<span class='ln'></span>"));
   chart(mc, doughnut(METHODS.map(m => T.method[m]), ["Early", "Absentee", "Election Day", "Mixed", "Unknown"],
-    ["#2F6FB0", "#5e9bd1", "#C2403B", "#B0883B", "#c9ccd4"]), 180);
+    ["#3A6AB8", "#60A5FA", "#E05555", "#F0B82A", "#5A6E80"]), 180);
   const pcd = el("div", "card pad");
   pcd.appendChild(el("p", "section-title", "Ballots cast by current registrants, by year<span class='ln'></span>"));
   partTimeline(pcd, 180);
@@ -190,8 +187,8 @@ function partTimeline(parent, h) {
     data: {
       labels: years,
       datasets: [
-        { label: "General", data: years.map(y => g[y] || 0), borderColor: "#2F6FB0", backgroundColor: "rgba(47,111,176,.08)", fill: true, tension: .3, pointRadius: 2 },
-        { label: "Primary", data: years.map(y => p[y] || 0), borderColor: C.accent, backgroundColor: "transparent", tension: .3, pointRadius: 2 },
+        { label: "General", data: years.map(y => g[y] || 0), borderColor: "#60A5FA", backgroundColor: "rgba(96,165,250,.1)", fill: true, tension: .3, pointRadius: 2, borderWidth: 2 },
+        { label: "Primary", data: years.map(y => p[y] || 0), borderColor: "#F0B82A", backgroundColor: "transparent", tension: .3, pointRadius: 2, borderWidth: 2 },
       ]
     },
     options: { plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: { size: 11 } } } }, scales: { x: gridX, y: gridY }, maintainAspectRatio: false }
@@ -315,16 +312,16 @@ let _map, _layer;
 function initMap() {
   if (!document.getElementById("map")) return;
   _map = L.map("map", { scrollWheelZoom: false, attributionControl: false });
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", { maxZoom: 18 }).addTo(_map);
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png", { maxZoom: 18, pane: "markerPane" }).addTo(_map);
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png", { maxZoom: 18 }).addTo(_map);
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png", { maxZoom: 18, pane: "markerPane" }).addTo(_map);
   _map.fitBounds(GEO.bounds, { padding: [18, 18] });
   paintMap();
 }
 function rampColor(v, min, max, ramp) {
   const t = max > min ? (v - min) / (max - min) : .5;
-  const base = ramp === "r" ? [194, 64, 59] : ramp === "d" ? [47, 111, 176] : ramp === "u" ? [107, 118, 137] : [178, 58, 46];
-  const lo = [245, 247, 250];
-  return `rgb(${lo.map((c, i) => Math.round(c + (base[i] - c) * (0.15 + .85 * t))).join(",")})`;
+  const base = ramp === "r" ? [224, 85, 85] : ramp === "d" ? [58, 106, 184] : ramp === "u" ? [120, 134, 156] : [34, 170, 188];
+  const lo = [18, 33, 51]; // dark navy floor so low values read on the dark basemap
+  return `rgb(${lo.map((c, i) => Math.round(c + (base[i] - c) * (0.22 + .78 * t))).join(",")})`;
 }
 function paintMap() {
   if (!_map) return;
@@ -334,12 +331,12 @@ function paintMap() {
   const min = Math.min(...vals), max = Math.max(...vals);
   _layer = L.geoJSON(GEO.towns, {
     style: f => { const t = TOWNS[f.properties.town]; const v = t ? m.get(t) : 0;
-      return { fillColor: rampColor(v, min, max, m.ramp), fillOpacity: .82, color: "#fff", weight: 1.5 }; },
+      return { fillColor: rampColor(v, min, max, m.ramp), fillOpacity: .88, color: "#06111F", weight: 1.2 }; },
     onEachFeature: (f, lyr) => {
       const t = TOWNS[f.properties.town]; if (!t) return;
       lyr.bindTooltip(`<b>${t.name}</b><br>${m.label}: ${m.fmt(m.get(t))}<br>${fmt(t.active)} active`, { sticky: true });
       lyr.on({
-        mouseover: e => e.target.setStyle({ weight: 3, color: "#0d131f" }),
+        mouseover: e => e.target.setStyle({ weight: 3, color: "#22AABC" }),
         mouseout: e => _layer.resetStyle(e.target),
         click: () => drillTown(t, "town"),
       });
@@ -367,7 +364,7 @@ ROUTES.historical = function (view) {
   tcard.appendChild(el("p", "section-title", "Turnout-tier composition of the active universe<span class='ln'></span>"));
   chart(tcard, {
     type: "bar",
-    data: { labels: TIERS, datasets: [{ data: TIERS.map(t => T.tier[t]), backgroundColor: ["#2f9e6f", "#7bb37e", "#cdb24a", "#c9ccd4"], borderRadius: 4, maxBarThickness: 70 }] },
+    data: { labels: TIERS, datasets: [{ data: TIERS.map(t => T.tier[t]), backgroundColor: ["#34D399", "#1A8B9A", "#F0B82A", "#5A6E80"], borderRadius: 4, maxBarThickness: 70 }] },
     options: { indexAxis: "y", plugins: { legend: { display: false } }, scales: { x: gridY, y: gridX }, maintainAspectRatio: false }
   }, 180);
   view.appendChild(tcard);
@@ -528,8 +525,8 @@ function oppCard(t, kind) {
   const card = el("div", "card pad click"); card.style.cursor = "pointer"; card.onclick = () => drillTown(t, kind);
   card.innerHTML = `<div class="between"><b>${t.name}</b><span class="chip tag-${o.class.replace(/[ /]/g, '.')}">${o.class}</span></div>
     <p class="muted" style="font-size:12.5px;margin:8px 0 12px">${o.why}</p>`;
-  [["Republican base", d.republican_base, PCOL.Republican], ["Unaffiliated density", d.unaffiliated_density, PCOL.Unaffiliated],
-  ["Turnout gap", d.turnout_gap, "#c98a23"], ["Contactability", d.field_contactability, "#2f9e6f"]].forEach(([lab, v, col]) => {
+  [["Republican base", d.republican_base, PCOL.Republican], ["Unaffiliated density", d.unaffiliated_density, "#9fb0c4"],
+  ["Turnout gap", d.turnout_gap, "#F0B82A"], ["Contactability", d.field_contactability, "#34D399"]].forEach(([lab, v, col]) => {
     card.innerHTML += `<div style="margin-bottom:7px"><div class="between" style="font-size:11.5px"><span class="muted">${lab}</span><b>${pc1(v)}</b></div>
       <div class="scorebar"><i style="width:${Math.min(100, v)}%;background:${col}"></i></div></div>`;
   });
@@ -679,7 +676,7 @@ ROUTES.datahealth = function (view) {
   cov.appendChild(el("p", "section-title", "Field coverage of the active universe<span class='ln'></span>"));
   HEALTH.checks.forEach(c => {
     const p = pct(c.ok, c.of);
-    const col = p >= 90 ? "#2f9e6f" : p >= 50 ? "#c98a23" : "#c2433b";
+    const col = p >= 90 ? "#34D399" : p >= 50 ? "#F0B82A" : "#F87171";
     cov.appendChild(el("div", "", `<div class="between" style="font-size:13px;margin:10px 0 5px">
       <span><b>${c.label}</b> <span class="muted">— ${c.enables}</span></span>
       <span class="mono">${fmt(c.ok)}/${fmt(c.of)} · ${pc1(p)}</span></div>
@@ -794,7 +791,7 @@ function kpiHtml(lab, val, sub, cls) {
   return `<div class="kpi ${cls || ""}"><div class="bar"></div><div class="lab">${lab}</div><div class="val">${val}</div><div class="sub">${sub || ""}</div></div>`;
 }
 function doughnut(data, labels, colors) {
-  return { type: "doughnut", data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 2, borderColor: "#fff" }] },
+  return { type: "doughnut", data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 2, borderColor: "#0D1F33" }] },
     options: { cutout: "62%", plugins: { legend: { position: "right", labels: { boxWidth: 9, font: { size: 11 } } } }, maintainAspectRatio: false } };
 }
 function sectionCard(title, content, isNode) {
