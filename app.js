@@ -34,6 +34,7 @@ const precList = () => Object.values(PREC).filter(p => p.active > 5).sort((a, b)
 /* ---- nav ---- */
 const NAV = [
   ["overview", "Overview"],
+  ["results", "Results"],
   ["geography", "Geography"],
   ["turnout", "Turnout"],
 ];
@@ -76,7 +77,7 @@ const gridY = { grid: { color: "rgba(255,255,255,.05)" }, border: { display: fal
 /* ============================ OVERVIEW ============================ */
 ROUTES.overview = function (view) {
   pageHead(view, C.candidate + " — District Snapshot",
-    "An aggregate snapshot of the registered voter file. No individual voter records are shown.");
+    "Aggregate registration and turnout intelligence. No individual voter records.");
 
   // four core registration numbers
   const k = el("div", "kpis");
@@ -121,21 +122,19 @@ function partyBar() {
 
 function narrative() {
   const tw = townList();
-  const rShare = T.party_pct.Republican, uShare = T.party_pct.Unaffiliated, dShare = T.party_pct.Democratic;
+  const r = T.party_pct.Republican, u = T.party_pct.Unaffiliated, d = T.party_pct.Democratic;
   const byR = [...tw].sort((x, y) => y.party_pct.Republican - x.party_pct.Republican);
   const topR = byR[0], lowR = byR[byR.length - 1];
   const byU = [...tw].sort((x, y) => y.party_pct.Unaffiliated - x.party_pct.Unaffiliated)[0];
   const card = el("div", "narr"); card.style.marginTop = "22px";
-  let html = `<h3>📍 What the district is telling us</h3>`;
+  let html = `<h3>The Read</h3>`;
   if (C.posture === "defense") {
-    html += `<p>Across ${tw.length} towns the active universe is <b>${pc1(rShare)} Republican</b>, <b>${pc1(dShare)} Democratic</b>, and <b>${pc1(uShare)} unaffiliated</b>. Registration alone is close, so the seat is held on turnout and unaffiliated margin, not party share.</p>`;
-    html += `<p><b>${topR.name}</b> is the strongest Republican ground (${pc1(topR.party_pct.Republican)} R). <b>${lowR.name}</b> is the most exposed (${pc1(lowR.party_pct.Republican)} R) and needs the tightest defense.</p>`;
-    html += `<p>Unaffiliated voters are densest in <b>${byU.name}</b> (${pc1(byU.party_pct.Unaffiliated)}). <b>${fmt(T.tier.Low)}</b> active voters sit in the lowest turnout tier — the pool to protect the margin.</p>`;
+    html += `<p>Registration is near-even — <b>${pc1(r)} R</b>, <b>${pc1(d)} D</b>, <b>${pc1(u)} U</b>. The seat turns on turnout and the unaffiliated margin, not party share.</p>`;
+    html += `<p>Strongest R ground: <b>${topR.name}</b> (${pc1(topR.party_pct.Republican)}). Most exposed: <b>${lowR.name}</b> (${pc1(lowR.party_pct.Republican)}). Unaffiliateds densest in <b>${byU.name}</b> (${pc1(byU.party_pct.Unaffiliated)}).</p>`;
   } else {
     const byRcount = [...tw].sort((x, y) => y.party.Republican - x.party.Republican)[0];
-    html += `<p>The active universe is <b>${pc1(dShare)} Democratic</b>, <b>${pc1(uShare)} unaffiliated</b>, and <b>${pc1(rShare)} Republican</b>. With the incumbent gone, the realistic path runs through the <b>${fmt(T.party.Unaffiliated)}</b> unaffiliated voters, not party conversion.</p>`;
-    html += `<p>Republican votes are most concentrated in <b>${byRcount.name}</b>. <b>${fmt(T.tier.Low + T.tier.None)}</b> active voters are low-propensity — including Republicans who under-voted and are cheap to re-activate.</p>`;
-    html += `<p>This is an opportunity district: treat every figure as a map of where to <b>focus first</b>, not a prediction of the result.</p>`;
+    html += `<p>The universe is <b>${pc1(d)} D</b>, <b>${pc1(u)} U</b>, <b>${pc1(r)} R</b>. With the seat open, the path runs through unaffiliated voters, not party conversion.</p>`;
+    html += `<p>R votes concentrate in <b>${byRcount.name}</b>. <b>${fmt(T.tier.Low + T.tier.None)}</b> active voters are low-propensity — cheap to re-activate.</p>`;
   }
   card.innerHTML = html;
   return card;
@@ -152,7 +151,7 @@ const GEO_METRICS = {
 };
 ROUTES.geography = function (view) {
   pageHead(view, "Town & Precinct Analysis",
-    "Geographic breakdown of the active universe. Choose a metric to recolor the map; click any town or precinct for a full drill-down.");
+    "Recolor the map by metric. Click any area to drill in.");
 
   if (GEO && GEO.towns && GEO.towns.features.length) {
     const mapCard = el("div", "card pad");
@@ -168,7 +167,7 @@ ROUTES.geography = function (view) {
     setTimeout(initMap, 30);
   } else {
     const note = el("div", "note info");
-    note.innerHTML = "<span>ℹ️</span><div>Town polygons aren’t available for this district yet, so the map is shown at town level only.</div>";
+    note.innerHTML = "<div>Town polygons unavailable — map shown at town level only.</div>";
     view.appendChild(note);
   }
 
@@ -299,7 +298,7 @@ function paintMap() {
 /* ============================ TURNOUT ============================ */
 ROUTES.turnout = function (view) {
   pageHead(view, "Turnout History",
-    "The four general elections that decide this seat, and where the district’s reliable and soft-turnout towns are. A turnout signal only — never a record of how anyone voted.");
+    "The four general elections that decide the seat, and where turnout runs reliable or soft. A turnout signal — not a record of how anyone voted.");
 
   // the four cycles that matter
   const g = C.gen_years || {}, p = C.pri_years || {};
@@ -351,11 +350,105 @@ function turnoutTakeaways() {
   const strong = byHigh[0], soft = byHigh[byHigh.length - 1];
   const distHigh = pct(T.high_turnout, T.active), distLow = pct(T.tier.Low + T.tier.None, T.active);
   const card = el("div", "narr"); card.style.margin = "0"; card.style.height = "100%";
-  card.innerHTML = `<h3>🗺️ Map takeaways</h3>
-    <p><b>${strong.name}</b> turns out strongest — <b>${pc1(pct(strong.tier.High, strong.active))}</b> of its active voters are high-propensity (5+ vote score).</p>
-    <p><b>${soft.name}</b> is the softest at <b>${pc1(pct(soft.tier.High, soft.active))}</b> — the district’s biggest reactivation upside.</p>
-    <p>District-wide, <b>${pc1(distHigh)}</b> of active voters are high-propensity and <b>${pc1(distLow)}</b> rarely vote. Presidential years (<b>2020, 2024</b>) draw far more ballots than midterms (<b>2018, 2022</b>).</p>`;
+  card.innerHTML = `<h3>Map Read</h3>
+    <p><b>${strong.name}</b> turns out strongest (<b>${pc1(pct(strong.tier.High, strong.active))}</b> high-propensity). <b>${soft.name}</b> softest (<b>${pc1(pct(soft.tier.High, soft.active))}</b>) — the biggest reactivation upside.</p>
+    <p>District-wide <b>${pc1(distHigh)}</b> high-propensity, <b>${pc1(distLow)}</b> rarely vote. Presidential years far outdraw midterms.</p>`;
   return card;
+}
+
+/* ============================ ELECTION RESULTS ============================ */
+let resRace = "house_2024";
+const RES = window.HD48_RESULTS;
+function resTotals(race) {
+  let d = 0, r = 0; Object.values(race.towns).forEach(t => { d += t.d; r += t.r; });
+  const two = d + r; return { d, r, two, dPct: 100 * d / two, rPct: 100 * r / two, margin: 100 * (d - r) / two };
+}
+const marginLabel = m => (m >= 0 ? "D+" : "R+") + Math.abs(m).toFixed(1);
+function colorForMargin(m) { // m = D − R, two-party points
+  if (m > 15) return "#1A3A8C"; if (m > 5) return "#3A6AB8"; if (m > -5) return "#5A6E80"; if (m > -15) return "#E05555"; return "#CC2222";
+}
+ROUTES.results = function (view) {
+  if (!RES) { view.appendChild(el("div", "note", "<div>Results data not loaded.</div>")); return; }
+  pageHead(view, "Election Results",
+    "Official CT Secretary of the State returns. The House seat was redrawn in 2021 — current HD-48 covers 2022 on; presidential rows are full-town totals.");
+
+  // race selector
+  const seg = el("div", "seg"); seg.style.marginBottom = "20px";
+  seg.innerHTML = RES.order.map(k => `<button class="seg-btn ${k === resRace ? "on" : ""}" data-k="${k}">${RES.races[k].label}</button>`).join("");
+  seg.querySelectorAll("button").forEach(b => b.onclick = () => { resRace = b.dataset.k; route(); });
+  view.appendChild(seg);
+
+  const race = RES.races[resRace];
+  const tot = resTotals(race);
+  const prev = RES.compare[resRace] ? RES.races[RES.compare[resRace]] : null;
+  const prevTot = prev ? resTotals(prev) : null;
+  const win = tot.r >= tot.d ? "r" : "d";
+  const winName = win === "r" ? race.rep.name : race.dem.name;
+  const swingTxt = prevTot ? (() => { const dm = tot.margin - prevTot.margin; return `${dm >= 0 ? "D" : "R"}+${Math.abs(dm).toFixed(1)} vs ${prev.year}`; })() : "—";
+
+  // summary strip
+  const sum = el("div", "rsum");
+  sum.innerHTML =
+    `<div><div class="lab">${race.office}</div><div class="win-pill ${win}">${winName} ✓</div><div class="sub">${race.scope}</div></div>
+     <div><div class="lab">${race.rep.name.split(" ").pop()} (R)</div><div class="val r">${fmt(tot.r)}</div><div class="sub">${pc1(tot.rPct)}</div></div>
+     <div><div class="lab">${race.dem.name.split(" ").pop()} (D)</div><div class="val d">${fmt(tot.d)}</div><div class="sub">${pc1(tot.dPct)}</div></div>
+     <div><div class="lab">Margin</div><div class="val ${win}">${marginLabel(tot.margin)}</div><div class="sub">swing ${swingTxt}</div></div>`;
+  view.appendChild(sum);
+
+  // map + town results
+  const row = el("div", "grid"); row.style.gridTemplateColumns = "1.5fr 1fr"; row.style.marginTop = "22px"; row.style.alignItems = "start";
+  const mapCard = el("div", "card pad");
+  mapCard.appendChild(el("p", "section-title", "Margin by town<span class='ln'></span>"));
+  const md = el("div"); md.id = "rmap"; mapCard.appendChild(md);
+  const lg = el("div", "legend"); lg.id = "rmap-legend"; lg.style.marginTop = "10px"; mapCard.appendChild(lg);
+  row.appendChild(mapCard);
+
+  const side = el("div", "card pad");
+  side.appendChild(el("p", "section-title", (prev ? "Town result & swing" : "Town result") + "<span class='ln'></span>"));
+  side.appendChild(townResultRows(race, prev));
+  row.appendChild(side);
+  view.appendChild(row);
+
+  setTimeout(() => resultsMap("rmap", race, "rmap-legend"), 30);
+};
+function townResultRows(race, prev) {
+  const col = el("div", "col"); col.style.gap = "10px";
+  RES.towns.forEach(tn => {
+    const t = race.towns[tn]; const two = t.d + t.r; const m = 100 * (t.d - t.r) / two;
+    const lead = m >= 0 ? "d" : "r";
+    let swing = "";
+    if (prev && prev.towns[tn]) {
+      const p = prev.towns[tn]; const pm = 100 * (p.d - p.r) / (p.d + p.r); const dm = m - pm;
+      swing = `<span class="swing ${dm >= 0 ? "d" : "r"}">${dm >= 0 ? "▲ D" : "▼ R"}+${Math.abs(dm).toFixed(1)}</span>`;
+    }
+    const row = el("div", "tres");
+    row.innerHTML = `<div class="between"><span class="tres-nm">${tn}</span><span class="tres-m ${lead}">${marginLabel(m)}${swing}</span></div>
+      <div class="pbar"><div class="pbar-seg d" style="width:${100 * t.d / two}%"><b>${fmt(t.d)}</b></div><div class="pbar-seg r" style="width:${100 * t.r / two}%"><b>${fmt(t.r)}</b></div></div>`;
+    col.appendChild(row);
+  });
+  return col;
+}
+function resultsMap(id, race, legendId) {
+  const map = L.map(id, { scrollWheelZoom: false, attributionControl: false });
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png", { maxZoom: 18 }).addTo(map);
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png", { maxZoom: 18, pane: "markerPane" }).addTo(map);
+  map.fitBounds(GEO.bounds, { padding: [18, 18] });
+  (window._maps = window._maps || []).push(map);
+  const layer = L.geoJSON(GEO.towns, {
+    style: f => { const t = race.towns[f.properties.town];
+      if (!t) return { fillColor: "#0F1A2C", fillOpacity: .5, color: "#06111F", weight: 1 };
+      const m = 100 * (t.d - t.r) / (t.d + t.r);
+      return { fillColor: colorForMargin(m), fillOpacity: .9, color: "#06111F", weight: 1.2 }; },
+    onEachFeature: (f, lyr) => { const t = race.towns[f.properties.town]; if (!t) return;
+      const m = 100 * (t.d - t.r) / (t.d + t.r);
+      lyr.bindTooltip(`<b>${f.properties.town}</b><br>${race.rep.name}: ${fmt(t.r)}<br>${race.dem.name}: ${fmt(t.d)}<br>${marginLabel(m)}`, { sticky: true });
+      lyr.on({ mouseover: e => e.target.setStyle({ weight: 3, color: "#22AABC" }), mouseout: e => layer.resetStyle(e.target) });
+    }
+  }).addTo(map);
+  const lg = legendId && document.getElementById(legendId);
+  if (lg) lg.innerHTML = [["#1A3A8C", "Safe D"], ["#3A6AB8", "Lean D"], ["#5A6E80", "Even"], ["#E05555", "Lean R"], ["#CC2222", "Safe R"]]
+    .map(([c, l]) => `<span><i style="background:${c}"></i>${l}</span>`).join("");
+  return map;
 }
 
 /* ============================ DRILL-DOWN (aggregate) ============================ */
