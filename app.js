@@ -54,7 +54,9 @@ function route() {
   document.querySelectorAll(".tab").forEach(a => a.classList.toggle("active", a.dataset.route === r));
   const meta = NAV.find(x => x[0] === r) || NAV[0];
   $("#t-title").textContent = meta[1];
-  $("#view").innerHTML = ""; window._charts && window._charts.forEach(c => c.destroy()); window._charts = [];
+  $("#view").innerHTML = "";
+  window._charts && window._charts.forEach(c => c.destroy()); window._charts = [];
+  window._maps && window._maps.forEach(m => { try { m.remove(); } catch (e) {} }); window._maps = [];
   (ROUTES[r] || ROUTES.overview)($("#view"));
   window.scrollTo(0, 0);
 }
@@ -137,22 +139,6 @@ function narrative() {
   }
   card.innerHTML = html;
   return card;
-}
-
-function partTimeline(parent, h) {
-  const g = C.gen_years || {}, p = C.pri_years || {};
-  const years = [...new Set([...Object.keys(g), ...Object.keys(p)])].map(Number).filter(y => y >= 2012).sort();
-  chart(parent, {
-    type: "line",
-    data: {
-      labels: years,
-      datasets: [
-        { label: "General", data: years.map(y => g[y] || 0), borderColor: "#60A5FA", backgroundColor: "rgba(96,165,250,.1)", fill: true, tension: .3, pointRadius: 2, borderWidth: 2 },
-        { label: "Primary", data: years.map(y => p[y] || 0), borderColor: "#F0B82A", backgroundColor: "transparent", tension: .3, pointRadius: 2, borderWidth: 2 },
-      ]
-    },
-    options: { plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: { size: 11 } } } }, scales: { x: gridX, y: gridY }, maintainAspectRatio: false }
-  }, h);
 }
 
 /* ============================ GEOGRAPHY ============================ */
@@ -254,7 +240,31 @@ function initMap() {
   L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png", { maxZoom: 18 }).addTo(_map);
   L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png", { maxZoom: 18, pane: "markerPane" }).addTo(_map);
   _map.fitBounds(GEO.bounds, { padding: [18, 18] });
+  (window._maps = window._maps || []).push(_map);
   paintMap();
+}
+/* generic choropleth builder (used by the turnout map) */
+function makeMap(id, getVal, label, fmtFn, ramp, legendId) {
+  const map = L.map(id, { scrollWheelZoom: false, attributionControl: false });
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png", { maxZoom: 18 }).addTo(map);
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png", { maxZoom: 18, pane: "markerPane" }).addTo(map);
+  map.fitBounds(GEO.bounds, { padding: [18, 18] });
+  (window._maps = window._maps || []).push(map);
+  const vals = GEO.towns.features.map(f => { const t = TOWNS[f.properties.town]; return t ? getVal(t) : 0; });
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const layer = L.geoJSON(GEO.towns, {
+    style: f => { const t = TOWNS[f.properties.town]; const v = t ? getVal(t) : 0;
+      return { fillColor: rampColor(v, min, max, ramp), fillOpacity: .88, color: "#06111F", weight: 1.2 }; },
+    onEachFeature: (f, lyr) => { const t = TOWNS[f.properties.town]; if (!t) return;
+      lyr.bindTooltip(`<b>${t.name}</b><br>${label}: ${fmtFn(getVal(t))}<br>${fmt(t.active)} active`, { sticky: true });
+      lyr.on({ mouseover: e => e.target.setStyle({ weight: 3, color: "#22AABC" }), mouseout: e => layer.resetStyle(e.target), click: () => drillTown(t, "town") });
+    }
+  }).addTo(map);
+  const lg = legendId && document.getElementById(legendId);
+  if (lg) lg.innerHTML = `<span class="muted">${label}:</span>` +
+    `<span><i style="background:${rampColor(min, min, max, ramp)}"></i>${fmtFn(min)}</span>` +
+    `<span><i style="background:${rampColor(max, min, max, ramp)}"></i>${fmtFn(max)}</span>`;
+  return map;
 }
 function rampColor(v, min, max, ramp) {
   const t = max > min ? (v - min) / (max - min) : .5;
@@ -289,25 +299,41 @@ function paintMap() {
 /* ============================ TURNOUT ============================ */
 ROUTES.turnout = function (view) {
   pageHead(view, "Turnout History",
-    "Participation reconstructed from the SOTS vote record of today’s registered voters. This is a turnout signal — not a record of how anyone voted, which is secret.");
+    "The four general elections that decide this seat, and where the district’s reliable and soft-turnout towns are. A turnout signal only — never a record of how anyone voted.");
 
-  // turnout-shape KPIs
-  const k = el("div", "kpis"); k.style.gridTemplateColumns = "repeat(3,1fr)";
-  kpi(k, "High-turnout voters", fmt(T.high_turnout), "5+ vote score", "gold");
-  kpi(k, "Low / none tier", fmt(T.tier.Low + T.tier.None), "reactivation room", "teal");
-  kpi(k, "Newly registered", fmt(T.newly_registered), "since last election", "teal");
-  view.appendChild(k);
+  // the four cycles that matter
+  const g = C.gen_years || {}, p = C.pri_years || {};
+  const CYC = [["2018", "Midterm", "mid"], ["2020", "Presidential", "pres"], ["2022", "Midterm", "mid"], ["2024", "Presidential", "pres"]];
+  const maxGen = Math.max(...CYC.map(c => g[c[0]] || 0)) || 1;
+  const cg = el("div", "cyc-grid");
+  cg.innerHTML = CYC.map(([yr, type, cls]) => {
+    const gen = g[yr] || 0, pri = p[yr] || 0;
+    return `<div class="cyc ${cls}">
+      <div class="cyc-eyebrow">${yr} · ${type}</div>
+      <div class="cyc-val">${fmt(gen)}</div>
+      <div class="cyc-lab">general ballots</div>
+      <div class="cyc-bar"><i style="width:${Math.round(100 * gen / maxGen)}%"></i></div>
+      <div class="cyc-pri">${fmt(pri)} primary ballots</div></div>`;
+  }).join("");
+  view.appendChild(cg);
 
-  // participation timeline
-  const card = el("div", "card pad"); card.style.marginTop = "22px";
-  card.appendChild(el("p", "section-title", "Ballots cast by current registrants — general vs primary<span class='ln'></span>"));
-  partTimeline(card, 280);
-  card.appendChild(el("div", "note info",
-    "<span>ℹ️</span><div>Counts reflect people <b>currently registered</b> in the district who cast a ballot in each year. Recent cycles look larger partly because more of today’s voters were registered then. Treat as a relative turnout gauge.</div>"));
-  view.appendChild(card);
+  // turnout map + written takeaways
+  if (GEO && GEO.towns && GEO.towns.features.length) {
+    const row = el("div", "grid"); row.style.gridTemplateColumns = "1.5fr 1fr"; row.style.marginTop = "22px"; row.style.alignItems = "stretch";
+    const mapCard = el("div", "card pad");
+    mapCard.appendChild(el("p", "section-title", "Turnout strength by town<span class='ln'></span>"));
+    const md = el("div"); md.id = "tmap"; mapCard.appendChild(md);
+    const lg = el("div", "legend"); lg.id = "tmap-legend"; lg.style.marginTop = "10px"; mapCard.appendChild(lg);
+    row.appendChild(mapCard);
+    row.appendChild(turnoutTakeaways());
+    view.appendChild(row);
+    setTimeout(() => makeMap("tmap", t => pct(t.tier.High, t.active), "High-turnout share", pc1, "a", "tmap-legend"), 30);
+  } else {
+    view.appendChild(turnoutTakeaways());
+  }
 
-  // turnout tiers + vote method
-  const row = el("div", "grid"); row.style.gridTemplateColumns = "1fr 1fr"; row.style.marginTop = "22px";
+  // tier + method graphics
+  const row2 = el("div", "grid"); row2.style.gridTemplateColumns = "1fr 1fr"; row2.style.marginTop = "22px";
   const tc = el("div", "card pad");
   tc.appendChild(el("p", "section-title", "Turnout tiers<span class='ln'></span>"));
   chart(tc, doughnut(TIERS.map(t => T.tier[t]), TIERS, ["#34D399", "#1A8B9A", "#F0B82A", "#5A6E80"]), 200);
@@ -315,9 +341,22 @@ ROUTES.turnout = function (view) {
   mc.appendChild(el("p", "section-title", "Vote-method tendency<span class='ln'></span>"));
   chart(mc, doughnut(METHODS.map(m => T.method[m]), ["Early", "Absentee", "Election Day", "Mixed", "Unknown"],
     ["#3A6AB8", "#60A5FA", "#E05555", "#F0B82A", "#5A6E80"]), 200);
-  row.appendChild(tc); row.appendChild(mc);
-  view.appendChild(row);
+  row2.appendChild(tc); row2.appendChild(mc);
+  view.appendChild(row2);
 };
+
+function turnoutTakeaways() {
+  const tw = townList();
+  const byHigh = [...tw].sort((a, b) => pct(b.tier.High, b.active) - pct(a.tier.High, a.active));
+  const strong = byHigh[0], soft = byHigh[byHigh.length - 1];
+  const distHigh = pct(T.high_turnout, T.active), distLow = pct(T.tier.Low + T.tier.None, T.active);
+  const card = el("div", "narr"); card.style.margin = "0"; card.style.height = "100%";
+  card.innerHTML = `<h3>🗺️ Map takeaways</h3>
+    <p><b>${strong.name}</b> turns out strongest — <b>${pc1(pct(strong.tier.High, strong.active))}</b> of its active voters are high-propensity (5+ vote score).</p>
+    <p><b>${soft.name}</b> is the softest at <b>${pc1(pct(soft.tier.High, soft.active))}</b> — the district’s biggest reactivation upside.</p>
+    <p>District-wide, <b>${pc1(distHigh)}</b> of active voters are high-propensity and <b>${pc1(distLow)}</b> rarely vote. Presidential years (<b>2020, 2024</b>) draw far more ballots than midterms (<b>2018, 2022</b>).</p>`;
+  return card;
+}
 
 /* ============================ DRILL-DOWN (aggregate) ============================ */
 function drillTown(t, kind) {
