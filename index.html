@@ -301,7 +301,8 @@ canvas{max-width:100%}
 /* map */
 #map{height:520px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--navy-tile);z-index:1}
 #tmap{height:440px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--navy-tile);z-index:1}
-#rmap{height:480px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--navy-tile);z-index:1}
+#rmap,#bmap{height:480px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--navy-tile);z-index:1}
+#bmap{height:300px}
 
 /* results: segmented race selector */
 .seg{display:inline-flex;border:1px solid var(--border-strong);border-radius:var(--r-sm);overflow:hidden;background:rgba(0,0,0,.22);flex-wrap:wrap}
@@ -332,6 +333,31 @@ canvas{max-width:100%}
 .swing{font-family:var(--ff-body);font-size:11px;font-weight:600;margin-left:9px;letter-spacing:.3px}
 .swing.d{color:var(--dem-lt)}.swing.r{color:var(--rep-lt)}
 @media(max-width:900px){.rsum{grid-template-columns:1fr 1fr}}
+
+/* ════════ verdict-first design system (NPS strategy build) ════════ */
+:root{
+  --navy-mid:#0C1D34; --navy-card:#0F2140;
+  --npa:#7C3AED; --npa-lt:#A78BFA;
+  --safe-d:#1A3A8C; --likely-d:#3A6AB8; --tossup:#5A6E80; --likely-r:#E05555; --safe-r:#CC2222;
+  --border-lt:rgba(255,255,255,.15); --hairline:rgba(255,255,255,.04);
+  --ff-cond:'Tungsten','Barlow Condensed','Oswald',sans-serif;
+}
+.kicker{font-family:var(--ff-cond);font-weight:600;font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:var(--fg-muted)}
+.h-page{font-family:var(--ff-cond);font-weight:700;font-size:32px;letter-spacing:.6px;text-transform:uppercase;line-height:1.02;color:var(--fg);margin-top:5px}
+.h-card{font-family:var(--ff-cond);font-weight:600;font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:var(--fg-muted)}
+.num{font-family:var(--ff-cond);font-weight:700;font-variant-numeric:tabular-nums lining-nums;letter-spacing:.3px}
+.lede{font-family:var(--ff-body);font-size:12.5px;line-height:1.5;color:var(--fg-dim)}
+.tag{font-family:var(--ff-cond);font-weight:600;font-size:11px;letter-spacing:.8px;text-transform:uppercase}
+.vcard{background:var(--navy-card);border:1px solid var(--border);border-radius:8px}
+.vhead{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.vrow{display:grid;gap:14px}
+.vbanner{display:flex;align-items:center;gap:12px;padding:9px 16px;border-radius:var(--r-md);
+  background:rgba(212,160,23,.07);border:1px solid rgba(212,160,23,.22);margin-top:22px}
+.prow{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:var(--r-md);cursor:pointer;
+  border:1px solid transparent;transition:background var(--d-fast)}
+.prow:hover{background:rgba(34,170,188,.07)}
+.cartile{aspect-ratio:1;border-radius:3px;transition:transform var(--d-fast)}
+.cartile:hover{transform:scale(1.08)}
 .leaflet-container{background:var(--navy-tile)!important}
 .leaflet-tooltip{background:rgba(6,17,31,.95)!important;border:1px solid rgba(255,255,255,.1)!important;color:var(--fg)!important;
   font-family:var(--ff-display)!important;font-weight:700!important;box-shadow:var(--shadow-tooltip)!important;border-radius:var(--r-md)!important;padding:8px 12px!important}
@@ -385,12 +411,12 @@ canvas{max-width:100%}
 
 <script src="assets/leaflet.js"></script>
 <script src="assets/chart.umd.min.js"></script>
-<script src="data/meta.js?v=5"></script>
-<script src="data/results.js?v=5"></script>
-<script src="data/towns.js?v=5"></script>
-<script src="data/precincts.js?v=5"></script>
-<script src="data/health.js?v=5"></script>
-<script src="data/geometry.js?v=5"></script>
-<script src="app.js?v=5"></script>
+<script src="data/meta.js?v=6"></script>
+<script src="data/results.js?v=6"></script>
+<script src="data/towns.js?v=6"></script>
+<script src="data/precincts.js?v=6"></script>
+<script src="data/health.js?v=6"></script>
+<script src="data/geometry.js?v=6"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>

@@ -33,9 +33,10 @@ const precList = () => Object.values(PREC).filter(p => p.active > 5).sort((a, b)
 
 /* ---- nav ---- */
 const NAV = [
-  ["overview", "Overview"],
+  ["verdict", "The Verdict"],
+  ["battlefield", "Battlefield"],
+  ["plan", "The Plan"],
   ["results", "Results"],
-  ["geography", "Geography"],
   ["turnout", "Turnout"],
 ];
 function buildNav() {
@@ -51,14 +52,14 @@ function buildNav() {
 /* ---- router ---- */
 const ROUTES = {};
 function route() {
-  const r = (location.hash.replace("#", "") || "overview").split("/")[0];
+  const r = (location.hash.replace("#", "") || "verdict").split("/")[0];
   document.querySelectorAll(".tab").forEach(a => a.classList.toggle("active", a.dataset.route === r));
   const meta = NAV.find(x => x[0] === r) || NAV[0];
   $("#t-title").textContent = meta[1];
   $("#view").innerHTML = "";
   window._charts && window._charts.forEach(c => c.destroy()); window._charts = [];
   window._maps && window._maps.forEach(m => { try { m.remove(); } catch (e) {} }); window._maps = [];
-  (ROUTES[r] || ROUTES.overview)($("#view"));
+  (ROUTES[r] || ROUTES.verdict)($("#view"));
   window.scrollTo(0, 0);
 }
 window.addEventListener("hashchange", route);
@@ -450,6 +451,277 @@ function resultsMap(id, race, legendId) {
     .map(([c, l]) => `<span><i style="background:${c}"></i>${l}</span>`).join("");
   return map;
 }
+
+/* ============================ VERDICT · BATTLEFIELD · PLAN ============================ */
+const CORE = ["Bozrah", "Colchester", "Franklin", "Lebanon"];
+const fmtK = n => n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + "k" : "" + Math.round(n);
+const H24 = resTotals(RES.races.house_2024), H22 = resTotals(RES.races.house_2022);
+const P20 = resTotals(RES.races.pres_2020), P24 = resTotals(RES.races.pres_2024);
+const corePrec = () => precList().filter(p => CORE.some(t => p.name.startsWith(t)));
+const precTown = p => CORE.find(t => p.name.startsWith(t)) || "";
+const netOpp = p => Math.round(p.active * p.opportunity.dims.unaffiliated_density / 100);
+const winNumber = Math.floor((H24.two) / 2) + 1;          // 50%+1 of the 2024 House two-party turnout
+const decisive24 = Math.abs(RES.races.house_2024.towns.Bozrah ? (H24.r - H24.d) : 0) || Math.round(Math.abs(H24.r - H24.d));
+
+function rateFromMargin(m) {
+  const a = Math.abs(m), side = m >= 0 ? "D" : "R";
+  const col = side === "R" ? "var(--rep-lt)" : "var(--dem-lt)";
+  if (a < 2) return ["TOSS-UP", "var(--gold-lt)"];
+  if (a < 6) return ["LEAN " + side, col];
+  if (a < 12) return ["LIKELY " + side, col];
+  return ["SAFE " + side, col];
+}
+function leanColorReg(l) { if (l > 12) return "var(--safe-d)"; if (l > 4) return "var(--likely-d)"; if (l > -4) return "var(--tossup)"; if (l > -12) return "var(--likely-r)"; return "var(--safe-r)"; }
+function leanLabelReg(l) { const a = Math.abs(Math.round(l * 10) / 10); return (l >= 0 ? "D+" : "R+") + a; }
+function townHouseMargin(town) { const t = RES.races.house_2024.towns[town]; return t ? 100 * (t.d - t.r) / (t.d + t.r) : 0; }
+function chipFor(cls) { const c = cls.toLowerCase();
+  if (c.indexOf("persuasion") >= 0) return "PERSUADE";
+  if (c.indexOf("turnout") >= 0 || c.indexOf("protect") >= 0 || c.indexOf("base") >= 0) return "GOTV";
+  if (c.indexOf("field") >= 0 || c.indexOf("regist") >= 0 || c.indexOf("expand") >= 0) return "EXPAND";
+  return "HOLD";
+}
+function chipStyle(type) {
+  const map = { GOTV: ["var(--teal-lt)", "rgba(26,139,154,.14)", "rgba(26,139,154,.34)"],
+    PERSUADE: ["var(--gold-lt)", "rgba(212,160,23,.14)", "rgba(212,160,23,.34)"],
+    EXPAND: ["var(--npa-lt)", "rgba(124,58,237,.16)", "rgba(124,58,237,.36)"],
+    HOLD: ["var(--rep-lt)", "rgba(220,38,38,.12)", "rgba(220,38,38,.3)"] };
+  const c = map[type] || map.HOLD;
+  return `display:inline-block;font-family:var(--ff-cond);font-weight:600;font-size:10px;letter-spacing:1px;padding:2px 7px;border-radius:2px;color:${c[0]};background:${c[1]};border:1px solid ${c[2]};`;
+}
+function vhead(kick, kickCol, title, right) {
+  return `<div class="vhead"><div><div class="kicker" style="color:${kickCol}">${kick}</div><div class="h-page">${title}</div></div><div class="kicker">${right}</div></div>`;
+}
+
+/* ───────────────── THE VERDICT ───────────────── */
+ROUTES.verdict = function (view) {
+  const [rating, ratingCol] = rateFromMargin(H24.margin);
+  const decisive = Math.abs(RES.races.house_2024.towns.Bozrah ? (H24.r - H24.d) : 0);
+  const dec = Math.abs(H24.r - H24.d);
+  const decaprio24 = H24.r, win = winNumber;
+  const cleared = decaprio24 - win;
+  // win-bar fill: DeCaprio's 2024 share of two-party
+  const fill = 100 * decaprio24 / H24.two;
+  // where the votes are (real universes)
+  const base = T.high_turnout, persu = T.party.Unaffiliated, regist = T.newly_registered;
+  const uSum = base + persu + regist;
+  const pBase = base / uSum * 100, pPersu = persu / uSum * 100, pReg = regist / uSum * 100;
+  // concentration
+  const cp = corePrec().slice().sort((a, b) => b.active - a.active);
+  const totAct = cp.reduce((s, p) => s + p.active, 0);
+  let cum = 0, k = 0; for (const p of cp) { cum += p.active; k++; if (cum / totAct >= 0.6) break; }
+  const concShare = Math.round(cum / totAct * 100);
+  // margin history rows
+  const hist = [
+    ["’20 P", P20.margin], ["’22 H", H22.margin], ["’24 P", P24.margin], ["’24 H", H24.margin],
+  ];
+  const histRows = hist.map(([yr, m]) => {
+    const d = m >= 0, w = Math.min(46, Math.abs(m) * 12 + 6), col = d ? "var(--dem)" : "var(--rep)", tc = d ? "var(--dem-lt)" : "var(--rep-lt)";
+    return `<div style="display:flex;align-items:center;gap:8px;"><span class="num" style="width:34px;font-size:12px;color:var(--fg-muted);">${yr}</span>
+      <div style="flex:1;display:flex;height:11px;"><div style="width:50%;display:flex;justify-content:flex-end;">${d ? "" : `<div style="width:${w}px;background:${col};border-radius:1px;"></div>`}</div><div style="width:1px;background:var(--border-lt);"></div><div style="width:50%;display:flex;">${d ? `<div style="width:${w}px;background:${col};border-radius:1px;"></div>` : ""}</div></div>
+      <span class="num" style="width:46px;font-size:12px;text-align:right;color:${tc};">${marginLabel(m)}</span></div>`;
+  }).join("");
+  // turnout sparkline (recent generals)
+  const g = C.gen_years || {}; const yrs = [2018, 2020, 2022, 2024]; const gv = yrs.map(y => g[y] || 0);
+  const gmax = Math.max(...gv) || 1; const spPts = gv.map((v, i) => `${8 + i * 96},${86 - (v / gmax) * 66}`);
+
+  view.innerHTML =
+    vhead("Election Overview · 2026 Cycle", "var(--teal-lt)", "State Of The Race", "Model · " + C.generated_at.slice(0, 10) + " · SOTS file + 2020–24 returns") +
+    `<div class="vrow" style="grid-template-columns:1.05fr 1fr 1fr;">
+      <div class="vcard" style="border-color:var(--border-lt);padding:18px 20px;">
+        <div class="h-card">Race Rating</div>
+        <div class="num" style="font-size:54px;line-height:.9;color:${ratingCol};margin-top:6px;">${rating}</div>
+        <div class="h-card" style="margin-top:18px;display:flex;justify-content:space-between;"><span>Margin · recent cycles</span><span style="color:var(--fg-dim);">R ◂ ▸ D</span></div>
+        <div style="display:flex;flex-direction:column;gap:7px;margin-top:10px;">${histRows}</div>
+        <div class="kicker" style="font-size:9px;margin-top:9px;color:var(--fg-dim);">P = president · H = state house (post-2021 district)</div>
+      </div>
+      <div class="vcard" style="padding:18px 20px;display:flex;flex-direction:column;">
+        <div class="h-card">Votes To Win</div>
+        <div class="num" style="font-size:52px;line-height:1;color:var(--fg);margin-top:4px;">${fmt(win)}</div>
+        <div class="lede" style="margin-top:2px;">50% + 1 of ${fmt(H24.two)} (2024 House turnout)</div>
+        <div style="margin-top:auto;padding-top:20px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span class="tag" style="color:var(--teal-lt);">DeCaprio ’24 · ${fmt(decaprio24)}</span><span class="tag" style="color:${cleared >= 0 ? "var(--teal-lt)" : "var(--rep-lt)"};">${cleared >= 0 ? "Cleared +" + fmt(cleared) : "Short " + fmt(-cleared)}</span></div>
+          <div style="position:relative;height:16px;border-radius:8px;background:#0F1A2C;overflow:hidden;">
+            <div style="position:absolute;inset:0 ${(100 - fill).toFixed(1)}% 0 0;background:linear-gradient(90deg,var(--teal),var(--teal-lt));"></div>
+            <div style="position:absolute;top:0;bottom:0;left:50%;width:2px;background:var(--gold-lt);"></div>
+          </div>
+          <div class="kicker" style="text-align:right;margin-top:5px;color:var(--fg-dim);">gold line = win number (50%)</div>
+        </div>
+      </div>
+      <div class="vcard" style="padding:18px 20px;">
+        <div class="h-card">Target Universes</div>
+        <div style="display:flex;height:28px;border-radius:var(--r-lg);overflow:hidden;margin-top:12px;">
+          <div class="num" style="width:${pBase}%;background:var(--teal);display:flex;align-items:center;justify-content:center;color:#04181c;font-size:12px;">${fmtK(base)}</div>
+          <div class="num" style="width:${pPersu}%;background:var(--gold);display:flex;align-items:center;justify-content:center;color:#241a02;font-size:12px;">${fmtK(persu)}</div>
+          <div class="num" style="width:${pReg}%;background:var(--npa);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;">${fmtK(regist)}</div>
+        </div>
+        <div style="margin-top:15px;display:flex;flex-direction:column;gap:10px;">
+          <div style="display:flex;align-items:center;gap:9px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--teal);flex-shrink:0;"></span><span class="tag" style="color:var(--fg);">High-turnout base</span><span class="num" style="margin-left:auto;color:var(--teal-lt);">${Math.round(pBase)}%</span></div>
+          <div style="display:flex;align-items:center;gap:9px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--gold);flex-shrink:0;"></span><span class="tag" style="color:var(--fg);">Unaffiliated persuasion</span><span class="num" style="margin-left:auto;color:var(--gold-lt);">${Math.round(pPersu)}%</span></div>
+          <div style="display:flex;align-items:center;gap:9px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--npa);flex-shrink:0;"></span><span class="tag" style="color:var(--fg);">Newly registered</span><span class="num" style="margin-left:auto;color:var(--npa-lt);">${Math.round(pReg)}%</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:12px;margin:24px 0 12px;"><span class="tag" style="font-size:12px;letter-spacing:2px;color:var(--gold-lt);">The Three Things That Decide It</span><span style="flex:1;height:1px;background:var(--border);"></span></div>
+    <div class="vrow" style="grid-template-columns:repeat(3,1fr);">
+      <div style="background:linear-gradient(160deg,rgba(212,160,23,.10),rgba(15,33,64,.4));border:1px solid rgba(212,160,23,.3);border-radius:var(--r-lg);padding:20px;">
+        <div class="kicker" style="color:var(--gold-lt);">01 · The Margin</div>
+        <div class="num" style="font-size:48px;line-height:1;margin-top:6px;">${fmt(dec)}</div>
+        <div class="kicker" style="margin-top:2px;">Decisive votes · 2024 house</div>
+        <div class="tag" style="display:block;margin-top:14px;color:var(--fg);">Won in the margins.</div>
+      </div>
+      <div style="background:linear-gradient(160deg,rgba(26,139,154,.12),rgba(15,33,64,.4));border:1px solid rgba(26,139,154,.3);border-radius:var(--r-lg);padding:20px;">
+        <div class="kicker" style="color:var(--teal-lt);">02 · The Map</div>
+        <div class="num" style="font-size:48px;line-height:1;margin-top:6px;">${concShare}<span style="font-size:22px;color:var(--fg-muted);">%</span></div>
+        <div class="kicker" style="margin-top:2px;">Of voters in ${k} precincts</div>
+        <div class="tag" style="display:block;margin-top:14px;color:var(--fg);">Concentrate, don’t spread.</div>
+      </div>
+      <div style="background:linear-gradient(160deg,rgba(124,58,237,.14),rgba(15,33,64,.4));border:1px solid rgba(124,58,237,.34);border-radius:var(--r-lg);padding:20px;">
+        <div class="kicker" style="color:var(--npa-lt);">03 · The Voters</div>
+        <div class="num" style="font-size:48px;line-height:1;margin-top:6px;">${fmt(persu)}</div>
+        <div class="kicker" style="margin-top:2px;">Persuadable unaffiliateds</div>
+        <div class="tag" style="display:block;margin-top:14px;color:var(--fg);">The swing, not the base.</div>
+      </div>
+    </div>
+
+    <div class="vrow" style="grid-template-columns:1.5fr 1fr;margin-top:18px;">
+      <div class="vcard" style="padding:18px 20px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;"><span class="h-card">Recent General-Election Turnout</span><span class="kicker" style="color:var(--gold-lt);">2018 → 2024</span></div>
+        <div style="position:relative;margin-top:14px;"><svg viewBox="0 0 308 96" style="width:100%;height:auto;display:block;overflow:visible;">
+          <line x1="0" y1="90" x2="308" y2="90" stroke="rgba(255,255,255,.1)" stroke-width="1"></line>
+          <polyline points="${spPts.join(" ")}" fill="none" stroke="var(--teal-lt)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></polyline>
+          ${spPts.map(p => { const [x, y] = p.split(","); return `<circle cx="${x}" cy="${y}" r="3" fill="var(--gold-lt)"></circle>`; }).join("")}
+        </svg></div>
+        <div style="display:flex;justify-content:space-between;margin-top:8px;">${yrs.map((y, i) => `<span class="kicker" style="font-size:10px;${i === 3 ? "color:var(--gold-lt);" : ""}">’${String(y).slice(2)} · ${fmtK(gv[i])}</span>`).join("")}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;">
+        <div style="background:var(--navy-card);padding:13px 16px;"><div class="h-card">Active Reg.</div><div class="num" style="font-size:23px;margin-top:4px;">${fmt(T.active)}</div></div>
+        <div style="background:var(--navy-card);padding:13px 16px;"><div class="h-card">2024 Turnout</div><div class="num" style="font-size:23px;margin-top:4px;color:var(--teal-lt);">${fmt(H24.two)}</div></div>
+        <div style="background:var(--navy-card);padding:13px 16px;"><div class="h-card">Win Number</div><div class="num" style="font-size:23px;margin-top:4px;color:var(--gold-lt);">${fmt(win)}</div></div>
+        <div style="background:var(--navy-card);padding:13px 16px;"><div class="h-card">DeCaprio ’24</div><div class="num" style="font-size:23px;margin-top:4px;">${fmt(decaprio24)}</div></div>
+      </div>
+    </div>
+    <div class="vbanner"><span class="tag" style="font-size:10px;color:var(--gold);">Note</span><span class="kicker" style="text-transform:none;letter-spacing:0;font-family:var(--ff-body);font-size:10.5px;">Registration, turnout & results are from the CT SOTS file and certified returns. The win number and target universes are projections for planning.</span></div>`;
+};
+
+/* ───────────────── BATTLEFIELD ───────────────── */
+let battleSel = 0;
+ROUTES.battlefield = function (view) {
+  const ps = corePrec().slice().sort((a, b) => netOpp(b) - netOpp(a));
+  battleSel = Math.min(battleSel, ps.length - 1);
+  const cur = ps[battleSel];
+  const curLean = cur.party_pct.Democratic - cur.party_pct.Republican;
+
+  const rows = ps.map((p, i) => {
+    const dem = Math.round(100 * p.party_pct.Democratic / (p.party_pct.Democratic + p.party_pct.Republican));
+    const type = chipFor(p.opportunity.class);
+    const sel = i === battleSel, target = i < 5;
+    const bg = sel ? "background:rgba(26,139,154,.14);border-color:rgba(26,139,154,.3);" : (target ? "background:rgba(212,160,23,.05);" : "");
+    return `<div class="prow" style="${bg}" data-i="${i}">
+      <span class="num" style="font-size:12px;color:var(--fg-muted);width:20px;text-align:right;flex-shrink:0;">${String(i + 1).padStart(2, "0")}</span>
+      <div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:8px;"><span class="num" style="font-size:14px;color:var(--fg);">${p.name}</span><span style="${chipStyle(type)}">${type}</span></div>
+      <div style="display:flex;height:4px;border-radius:2px;overflow:hidden;margin-top:5px;background:#0F1A2C;"><div style="width:${dem}%;background:var(--dem);"></div><div style="width:${100 - dem}%;background:var(--rep);"></div></div></div>
+      <div style="text-align:right;flex-shrink:0;"><div class="num" style="font-size:14px;color:var(--gold-lt);">${fmt(netOpp(p))}</div><div class="kicker" style="font-size:9px;">net opp</div></div></div>`;
+  }).join("");
+
+  // cartogram tiles from precincts, colored by their town's 2024 house margin
+  const tiles = ps.map((p, i) => {
+    const m = townHouseMargin(precTown(p)); const ring = i < 5;
+    return `<div class="cartile" style="background:${colorForMargin(m)};${ring ? "box-shadow:0 0 0 2px var(--gold),inset 0 0 0 1px rgba(0,0,0,.3);" : "opacity:.92;"}"></div>`;
+  }).join("");
+
+  view.innerHTML =
+    vhead("Path To Victory · Precinct Targeting", "var(--teal-lt)", "The Battlefield", "Click a precinct · gold ring = priority five") +
+    `<div class="vrow" style="grid-template-columns:1fr 1fr;">
+      <div style="background:var(--navy-mid);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:13px 16px;border-bottom:1px solid var(--border);"><span class="h-card">Precincts By Net Opportunity</span><span class="kicker" style="color:var(--fg-dim);">${ps.length} of ${ps.length}</span></div>
+        <div id="prows" style="padding:6px;">${rows}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div class="vcard" style="border-color:var(--border-lt);padding:16px 18px;">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;"><div class="num" style="font-size:24px;color:var(--fg);">${cur.name}</div><div class="kicker">${precTown(cur)} · HD-48</div></div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--r-sm);overflow:hidden;margin-top:12px;">
+            <div style="background:var(--navy-mid);padding:10px 12px;"><div class="h-card">Reg. Lean</div><div class="num" style="font-size:19px;margin-top:3px;color:${leanColorReg(curLean) === "var(--tossup)" ? "var(--fg-dim)" : leanColorReg(curLean)};">${leanLabelReg(curLean)}</div></div>
+            <div style="background:var(--navy-mid);padding:10px 12px;"><div class="h-card">Active</div><div class="num" style="font-size:19px;margin-top:3px;">${fmt(cur.active)}</div></div>
+            <div style="background:var(--navy-mid);padding:10px 12px;"><div class="h-card">Net Opp.</div><div class="num" style="font-size:19px;margin-top:3px;color:var(--gold-lt);">${fmt(netOpp(cur))}</div></div>
+          </div>
+          <div style="margin-top:12px;display:flex;gap:9px;align-items:center;"><span style="${chipStyle(chipFor(cur.opportunity.class))}">${chipFor(cur.opportunity.class)}</span><span class="lede" style="flex:1;color:var(--fg);">${cur.opportunity.why}</span></div>
+        </div>
+        <div style="background:var(--navy-mid);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px 18px;flex:1;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><span class="h-card">District Map · 2024 House Margin</span><span class="kicker" style="color:var(--fg-dim);">click a town</span></div>
+          <div id="bmap"></div>
+          <div style="display:flex;gap:14px;margin-top:12px;flex-wrap:wrap;align-items:center;">
+            <span style="display:flex;align-items:center;gap:6px;"><span style="width:14px;height:9px;border-radius:2px;background:var(--safe-d);"></span><span class="kicker">D</span></span>
+            <span style="display:flex;align-items:center;gap:6px;"><span style="width:14px;height:9px;border-radius:2px;background:var(--tossup);"></span><span class="kicker">Even</span></span>
+            <span style="display:flex;align-items:center;gap:6px;"><span style="width:14px;height:9px;border-radius:2px;background:var(--safe-r);"></span><span class="kicker">R</span></span>
+            <span style="display:flex;align-items:center;gap:6px;margin-left:auto;"><span style="width:11px;height:11px;border-radius:2px;border:2px solid var(--gold);"></span><span class="kicker" style="color:var(--gold-lt);">Priority 5</span></span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(${Math.min(8, ps.length)},1fr);gap:5px;margin-top:14px;">${tiles}</div>
+          <div class="kicker" style="font-size:9px;margin-top:8px;color:var(--fg-dim);">Cartogram · 1 tile = precinct, shaded by town 2024 house margin</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="vrow" style="grid-template-columns:repeat(3,1fr);margin-top:14px;">
+      <div style="background:linear-gradient(160deg,rgba(124,58,237,.14),rgba(15,33,64,.35));border:1px solid rgba(124,58,237,.3);border-radius:var(--r-lg);padding:16px 18px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;"><span class="kicker" style="color:var(--npa-lt);">Persuasion Universe</span><span class="tag" style="color:var(--npa-lt);">Lead</span></div>
+        <div class="num" style="font-size:38px;line-height:1;margin-top:4px;">${fmt(T.party.Unaffiliated)}</div>
+        <div style="height:8px;border-radius:4px;background:var(--npa);margin-top:10px;"></div></div>
+      <div style="background:linear-gradient(160deg,rgba(26,139,154,.12),rgba(15,33,64,.35));border:1px solid rgba(26,139,154,.28);border-radius:var(--r-lg);padding:16px 18px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;"><span class="kicker" style="color:var(--teal-lt);">Turnout Universe</span><span class="tag" style="color:var(--teal-lt);">GOTV</span></div>
+        <div class="num" style="font-size:38px;line-height:1;margin-top:4px;">${fmt(T.high_turnout)}</div>
+        <div style="height:8px;border-radius:4px;background:#0F1A2C;margin-top:10px;overflow:hidden;"><div style="height:100%;width:${Math.round(100 * T.high_turnout / T.active)}%;background:var(--teal);"></div></div></div>
+      <div style="background:linear-gradient(160deg,rgba(212,160,23,.1),rgba(15,33,64,.35));border:1px solid rgba(212,160,23,.28);border-radius:var(--r-lg);padding:16px 18px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;"><span class="kicker" style="color:var(--gold-lt);">Registration Upside</span><span class="tag" style="color:var(--gold-lt);">Expand</span></div>
+        <div class="num" style="font-size:38px;line-height:1;margin-top:4px;">${fmt(T.newly_registered)}</div>
+        <div style="height:8px;border-radius:4px;background:#0F1A2C;margin-top:10px;overflow:hidden;"><div style="height:100%;width:${Math.round(100 * T.newly_registered / T.active)}%;background:var(--gold);"></div></div></div>
+    </div>`;
+
+  view.querySelectorAll("#prows .prow").forEach(el => el.onclick = () => { battleSel = +el.dataset.i; route(); });
+  setTimeout(() => resultsMap("bmap", RES.races.house_2024, null), 30);
+};
+
+/* ───────────────── THE PLAN ───────────────── */
+ROUTES.plan = function (view) {
+  const cp = corePrec().slice().sort((a, b) => b.active - a.active);
+  const totAct = cp.reduce((s, p) => s + p.active, 0);
+  let cum = 0, k = 0; for (const p of cp) { cum += p.active; k++; if (cum / totAct >= 0.6) break; }
+  const conc = Math.round(cum / totAct * 100);
+  const dec = Math.abs(H24.r - H24.d);
+  const C0 = 263.9; // donut circumference
+  const alloc = [["Field", 38, "var(--teal)", "var(--teal-lt)"], ["Mail", 27, "var(--gold)", "var(--gold-lt)"], ["Digital", 22, "var(--npa)", "var(--npa-lt)"], ["Data", 13, "var(--fg-muted)", "var(--fg-dim)"]];
+  let off = 0; const arcs = alloc.map(([, pc, col]) => { const len = pc / 100 * C0; const s = `<circle cx="50" cy="50" r="42" fill="none" stroke="${col}" stroke-width="15" stroke-dasharray="${len.toFixed(1)} ${C0}" stroke-dashoffset="${(-off).toFixed(1)}"></circle>`; off += len; return s; }).join("");
+  const legend = alloc.map(([lab, pc, col, lt]) => `<div style="display:flex;align-items:center;gap:9px;"><span style="width:10px;height:10px;border-radius:2px;background:${col};"></span><span class="tag" style="flex:1;color:var(--fg);">${lab}</span><span class="num" style="color:${lt};">${pc}%</span></div>`).join("");
+  const phases = [["WK 18–12", "Register & Expand", "212,160,23", "var(--gold-lt)"], ["WK 12–5", "Persuade The Swing", "124,58,237", "var(--npa-lt)"], ["WK 5–1", "Bank Early Vote", "26,139,154", "var(--teal-lt)"], ["FINAL WK", "GOTV — Drive The Universe", "220,38,38", "var(--rep-lt)"]];
+  const timeline = phases.map(([wk, lab, rgb, c]) => `<div style="display:flex;align-items:center;gap:10px;"><span class="num" style="width:66px;flex-shrink:0;font-size:11px;color:var(--fg-muted);">${wk}</span><div class="tag" style="flex:1;height:26px;border-radius:var(--r-sm);background:rgba(${rgb},.16);border:1px solid rgba(${rgb},.32);display:flex;align-items:center;padding:0 12px;color:${c};">${lab}</div></div>`).join("");
+  const pillars = [
+    ["Pillar 01", "var(--npa-lt)", "Persuasion First", "+" + fmt(dec), "2024 margin to defend", "var(--npa)"],
+    ["Pillar 02", "var(--teal-lt)", "Concentrate Turf", k + "<span style='font-size:15px;color:var(--fg-muted);'> pcts</span>", conc + "% of voters", "var(--teal)"],
+    ["Pillar 03", "var(--gold-lt)", "Bank The Vote", "60%", "of base, early", "var(--gold)"],
+    ["Pillar 04", "var(--fg-dim)", "Data Discipline", "Weekly", "refresh vs SOTS", "var(--fg-muted)"],
+  ].map(([k0, kc, t, v, s, bt]) => `<div style="background:var(--navy-mid);border:1px solid var(--border);border-radius:var(--r-lg);padding:18px;border-top:2px solid ${bt};"><div class="kicker" style="color:${kc};">${k0}</div><div class="tag" style="display:block;font-size:15px;margin-top:6px;">${t}</div><div class="num" style="font-size:30px;margin-top:8px;color:var(--fg);">${v}</div><div class="kicker" style="margin-top:3px;">${s}</div></div>`).join("");
+
+  view.innerHTML =
+    vhead("Strategic Program · 18 Weeks Out", "var(--teal-lt)", "The Plan", "Persuasion-led · concentrated · banked early") +
+    `<div class="vrow" style="grid-template-columns:1.1fr 1fr;">
+      <div class="vcard" style="padding:18px 20px;">
+        <div class="h-card">Recommended Resource Allocation</div>
+        <div style="display:flex;align-items:center;gap:22px;margin-top:14px;">
+          <svg viewBox="0 0 100 100" style="width:128px;height:128px;flex-shrink:0;transform:rotate(-90deg);"><circle cx="50" cy="50" r="42" fill="none" stroke="#0F1A2C" stroke-width="15"></circle>${arcs}</svg>
+          <div style="flex:1;display:flex;flex-direction:column;gap:10px;">${legend}</div>
+        </div>
+        <div class="kicker" style="font-size:9px;margin-top:14px;color:var(--fg-dim);">Recommended mix — adjust to budget and calendar.</div>
+      </div>
+      <div class="vcard" style="padding:18px 20px;">
+        <div class="h-card">Program Timeline</div>
+        <div style="display:flex;flex-direction:column;gap:9px;margin-top:14px;">${timeline}</div>
+        <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);display:flex;justify-content:space-between;"><div><div class="h-card">Early vote opens</div><div class="num" style="font-size:16px;color:var(--teal-lt);margin-top:2px;">WEEK 3</div></div><div style="text-align:right;"><div class="h-card">Bank-before-eday</div><div class="num" style="font-size:16px;color:var(--gold-lt);margin-top:2px;">60% of base</div></div></div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;margin:22px 0 12px;"><span class="tag" style="font-size:12px;letter-spacing:2px;color:var(--gold-lt);">Four Strategic Pillars</span><span style="flex:1;height:1px;background:var(--border);"></span></div>
+    <div class="vrow" style="grid-template-columns:repeat(4,1fr);">${pillars}</div>
+    <div class="vbanner"><span class="tag" style="font-size:10px;color:var(--gold);">Note</span><span class="kicker" style="text-transform:none;letter-spacing:0;font-family:var(--ff-body);font-size:10.5px;">Pillar metrics are SOTS-derived; allocation, timeline and bank targets are a recommended program, not data.</span></div>`;
+};
 
 /* ============================ DRILL-DOWN (aggregate) ============================ */
 function drillTown(t, kind) {
