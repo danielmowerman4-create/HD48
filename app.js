@@ -35,6 +35,7 @@ const precList = () => Object.values(PREC).filter(p => p.active > 5).sort((a, b)
 const NAV = [
   ["verdict", "The Verdict"],
   ["battlefield", "Battlefield"],
+  ["geography", "Geography"],
   ["plan", "The Plan"],
   ["results", "Results"],
   ["turnout", "Turnout"],
@@ -721,6 +722,53 @@ ROUTES.plan = function (view) {
     <div style="display:flex;align-items:center;gap:12px;margin:22px 0 12px;"><span class="tag" style="font-size:12px;letter-spacing:2px;color:var(--gold-lt);">Four Strategic Pillars</span><span style="flex:1;height:1px;background:var(--border);"></span></div>
     <div class="vrow" style="grid-template-columns:repeat(4,1fr);">${pillars}</div>
     <div class="vbanner"><span class="tag" style="font-size:10px;color:var(--gold);">Note</span><span class="kicker" style="text-transform:none;letter-spacing:0;font-family:var(--ff-body);font-size:10.5px;">Pillar metrics are SOTS-derived; allocation, timeline and bank targets are a recommended program, not data.</span></div>`;
+};
+
+/* ───────────────── GEOGRAPHY · TOWN & PRECINCT ───────────────── */
+ROUTES.geography = function (view) {
+  const m = GEO_METRICS[geoMetric];
+  const metricKeys = [["republican_share", "R Share"], ["unaffiliated_share", "Unaff."], ["turnout_gap", "Low-Turnout"], ["active", "Active"]];
+  const seg = metricKeys.map(([k, lab]) => `<button class="seg-btn ${k === geoMetric ? "on" : ""}" data-k="${k}">${lab}</button>`).join("");
+
+  const towns = townList();
+  const tvals = towns.map(t => m.get(t)); const tmin = Math.min(...tvals), tmax = Math.max(...tvals);
+  const townRows = towns.map(t => {
+    const v = m.get(t), col = rampColor(v, tmin, tmax, m.ramp);
+    return `<div class="prow" data-town="${t.name}"><span style="width:12px;height:12px;border-radius:3px;background:${col};flex-shrink:0;"></span>
+      <span class="num" style="font-size:15px;flex:1;">${t.name}</span><span class="num" style="color:var(--gold-lt);">${m.fmt(v)}</span>
+      <span class="kicker" style="width:56px;text-align:right;">${fmt(t.active)} act</span></div>`;
+  }).join("");
+
+  const precs = corePrec();
+  const pvals = precs.map(p => m.get(p)); const pmin = Math.min(...pvals), pmax = Math.max(...pvals);
+  const precTiles = precs.map(p => {
+    const v = m.get(p), col = rampColor(v, pmin, pmax, m.ramp);
+    return `<div class="ptile" data-prec="${p.name}" style="background:linear-gradient(160deg,${col},rgba(15,33,64,.55));">
+      <div class="num" style="font-size:14px;">${p.name}</div><div class="num" style="font-size:24px;margin-top:6px;color:var(--fg);">${m.fmt(v)}</div>
+      <div class="kicker" style="margin-top:2px;">${fmt(p.active)} active</div></div>`;
+  }).join("");
+
+  view.innerHTML =
+    vhead("Geographic Breakdown · Recolor By Metric", "var(--teal-lt)", "Town & Precinct", "Click a town or precinct to drill in") +
+    `<div class="seg" style="margin-bottom:18px;">${seg}</div>
+    <div class="vrow" style="grid-template-columns:1.6fr 1fr;">
+      <div class="vcard" style="padding:18px 20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><span class="h-card">District Map · ${m.label}</span><span class="kicker" style="color:var(--fg-dim);">4 towns</span></div>
+        <div id="gmap"></div><div class="legend" id="gmap-legend" style="margin-top:10px;"></div>
+      </div>
+      <div class="vcard" style="padding:18px 20px;">
+        <div class="h-card" style="margin-bottom:12px;">Towns · ${m.label}</div>
+        <div style="display:flex;flex-direction:column;gap:6px;">${townRows}</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;margin:22px 0 12px;"><span class="tag" style="font-size:12px;letter-spacing:2px;color:var(--teal-lt);">Precincts · ${m.label}</span><span style="flex:1;height:1px;background:var(--border);"></span></div>
+    <div class="ptile-grid">${precTiles}</div>
+    <div class="vbanner"><span class="tag" style="font-size:10px;color:var(--gold);">Note</span><span class="kicker" style="text-transform:none;letter-spacing:0;font-family:var(--ff-body);font-size:10.5px;">Town boundaries are mapped from SOTS geography. Precinct shapes aren’t published by the state, so precincts are shown as a metric grid — click any to drill in.</span></div>`;
+
+  view.querySelector(".seg").querySelectorAll("button").forEach(b => b.onclick = () => { geoMetric = b.dataset.k; route(); });
+  view.querySelectorAll("[data-town]").forEach(el => el.onclick = () => drillTown(TOWNS[el.dataset.town], "town"));
+  view.querySelectorAll("[data-prec]").forEach(el => el.onclick = () => drillTown(corePrec().find(p => p.name === el.dataset.prec), "precinct"));
+  setTimeout(() => makeMap("gmap", m.get, m.label, m.fmt, m.ramp, "gmap-legend"), 30);
 };
 
 /* ============================ DRILL-DOWN (aggregate) ============================ */

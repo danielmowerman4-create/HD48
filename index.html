@@ -301,8 +301,12 @@ canvas{max-width:100%}
 /* map */
 #map{height:520px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--navy-tile);z-index:1}
 #tmap{height:440px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--navy-tile);z-index:1}
-#rmap,#bmap{height:480px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--navy-tile);z-index:1}
+#rmap,#bmap,#gmap{height:480px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--navy-tile);z-index:1}
 #bmap{height:300px}
+#gmap{height:420px}
+.ptile-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.ptile{border-radius:var(--r-lg);padding:14px 16px;cursor:pointer;transition:transform var(--d-fast)}
+.ptile:hover{transform:translateY(-2px)}
 
 /* results: segmented race selector */
 .seg{display:inline-flex;border:1px solid var(--border-strong);border-radius:var(--r-sm);overflow:hidden;background:rgba(0,0,0,.22);flex-wrap:wrap}
@@ -411,12 +415,12 @@ canvas{max-width:100%}
 
 <script src="assets/leaflet.js"></script>
 <script src="assets/chart.umd.min.js"></script>
-<script src="data/meta.js?v=6"></script>
-<script src="data/results.js?v=6"></script>
-<script src="data/towns.js?v=6"></script>
-<script src="data/precincts.js?v=6"></script>
-<script src="data/health.js?v=6"></script>
-<script src="data/geometry.js?v=6"></script>
-<script src="app.js?v=6"></script>
+<script src="data/meta.js?v=7"></script>
+<script src="data/results.js?v=7"></script>
+<script src="data/towns.js?v=7"></script>
+<script src="data/precincts.js?v=7"></script>
+<script src="data/health.js?v=7"></script>
+<script src="data/geometry.js?v=7"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>
