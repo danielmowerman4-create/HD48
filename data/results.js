@@ -14,9 +14,10 @@
      district — so they are comparable year-to-year but not district-exact.
    - 2024 Rivers totals combine his Democratic + Working Families lines (cross-endorsed).
 */
-window.HD48_RESULTS = {
+window.RESULTS = {
+  note: "Official CT Secretary of the State returns. The House seat was redrawn in 2021 — current HD-48 covers 2022 on; presidential rows are full-town totals.",
   towns: ["Bozrah", "Colchester", "Franklin", "Lebanon"],
-  order: ["house_2024", "house_2022", "pres_2024", "pres_2020"],
+  order: ["pres_2020", "house_2022", "pres_2024", "house_2024"],
   compare: { house_2024: "house_2022", pres_2024: "pres_2020" },
   races: {
     house_2024: {

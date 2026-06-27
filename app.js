@@ -4,7 +4,7 @@
    prepared SOTS data. */
 (function () {
 "use strict";
-const C = window.CAMPAIGN, TOWNS = window.TOWN_SUMMARY, PREC = window.PRECINCT_SUMMARY, GEO = window.GEOMETRY;
+const C = window.CAMPAIGN, TOWNS = window.TOWN_SUMMARY, PREC = window.PRECINCT_SUMMARY, GEO = window.GEOMETRY, TARGET = window.TARGET_UNIVERSE;
 const PARTY = ["Republican", "Democratic", "Unaffiliated", "Minor / Other"];
 const PCOL = { "Republican": "#E05555", "Democratic": "#3A6AB8", "Unaffiliated": "#5A6E80", "Minor / Other": "#D4A017" };
 const TIERS = ["High", "Medium", "Low", "None"];
@@ -28,13 +28,15 @@ const pct = (n, d) => d ? Math.round(1000 * n / d) / 10 : 0;
 const pc1 = n => (n == null ? "—" : n.toFixed(1) + "%");
 const T = C.totals;
 const shortP = p => p === "Minor / Other" ? "Other" : p.replace("ublican", "").replace("ocratic", "").replace("affiliated", "naff");
-const townList = () => Object.values(TOWNS).filter(t => t.active > 25).sort((a, b) => b.active - a.active);
+const DTOWNS = (window.RESULTS && window.RESULTS.towns) || null; // district towns, when results are loaded
+const townList = () => Object.values(TOWNS).filter(t => t.active > 25 && (!DTOWNS || DTOWNS.includes(t.name))).sort((a, b) => b.active - a.active);
 const precList = () => Object.values(PREC).filter(p => p.active > 5).sort((a, b) => b.active - a.active);
 
 /* ---- nav ---- */
 const NAV = [
   ["verdict", "The Verdict"],
   ["battlefield", "Battlefield"],
+  ["targets", "Targets"],
   ["geography", "Geography"],
   ["results", "Results"],
   ["turnout", "Turnout"],
@@ -359,7 +361,7 @@ function turnoutTakeaways() {
 
 /* ============================ ELECTION RESULTS ============================ */
 let resRace = "house_2024";
-const RES = window.HD48_RESULTS;
+const RES = window.RESULTS;
 function resTotals(race) {
   let d = 0, r = 0; Object.values(race.towns).forEach(t => { d += t.d; r += t.r; });
   const two = d + r; return { d, r, two, dPct: 100 * d / two, rPct: 100 * r / two, margin: 100 * (d - r) / two };
@@ -370,8 +372,9 @@ function colorForMargin(m) { // m = D − R, two-party points
 }
 ROUTES.results = function (view) {
   if (!RES) { view.appendChild(el("div", "note", "<div>Results data not loaded.</div>")); return; }
+  if (!RES.races[resRace]) resRace = RES.order[0];
   pageHead(view, "Election Results",
-    "Official CT Secretary of the State returns. The House seat was redrawn in 2021 — current HD-48 covers 2022 on; presidential rows are full-town totals.");
+    RES.note || "Official CT Secretary of the State returns. Presidential rows are full-town totals; House rows are district returns.");
 
   // race selector
   const seg = el("div", "seg"); seg.style.marginBottom = "20px";
@@ -453,15 +456,23 @@ function resultsMap(id, race, legendId) {
 }
 
 /* ============================ VERDICT · BATTLEFIELD · PLAN ============================ */
-const CORE = ["Bozrah", "Colchester", "Franklin", "Lebanon"];
+/* config-driven: derive everything from the loaded RESULTS + campaign config */
+const CORE = RES ? RES.towns.slice() : Object.keys(TOWNS).filter(t => TOWNS[t].active > 25);
 const fmtK = n => n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + "k" : "" + Math.round(n);
-const H24 = resTotals(RES.races.house_2024), H22 = resTotals(RES.races.house_2022);
-const P20 = resTotals(RES.races.pres_2020), P24 = resTotals(RES.races.pres_2024);
+const houseKeys = RES ? RES.order.filter(k => RES.races[k].kind === "House") : [];
+const presKeys = RES ? RES.order.filter(k => RES.races[k].kind === "President") : [];
+const mainHouseKey = houseKeys.length ? houseKeys.reduce((a, b) => RES.races[a].year >= RES.races[b].year ? a : b) : (RES && RES.order[RES.order.length - 1]);
+const HMAIN = mainHouseKey ? resTotals(RES.races[mainHouseKey]) : { d: 0, r: 0, two: 0, margin: 0 };
+const HMAINrace = mainHouseKey ? RES.races[mainHouseKey] : null;
 const corePrec = () => precList().filter(p => CORE.some(t => p.name.startsWith(t)));
 const precTown = p => CORE.find(t => p.name.startsWith(t)) || "";
 const netOpp = p => Math.round(p.active * p.opportunity.dims.unaffiliated_density / 100);
-const winNumber = Math.floor((H24.two) / 2) + 1;          // 50%+1 of the 2024 House two-party turnout
-const decisive24 = Math.abs(RES.races.house_2024.towns.Bozrah ? (H24.r - H24.d) : 0) || Math.round(Math.abs(H24.r - H24.d));
+const winNumber = Math.floor((HMAIN.two) / 2) + 1;        // 50%+1 of the latest contested House turnout
+/* the candidate's own party totals for the win-gauge */
+const myParty = (C.party || "R") === "D" ? "d" : "r";
+const myVotes = HMAIN[myParty];
+const myLast = (C.candidate || "").split(" ").pop();
+const myYear = HMAINrace ? HMAINrace.year : 2024;
 
 function rateFromMargin(m) {
   const a = Math.abs(m), side = m >= 0 ? "D" : "R";
@@ -473,7 +484,7 @@ function rateFromMargin(m) {
 }
 function leanColorReg(l) { if (l > 12) return "var(--safe-d)"; if (l > 4) return "var(--likely-d)"; if (l > -4) return "var(--tossup)"; if (l > -12) return "var(--likely-r)"; return "var(--safe-r)"; }
 function leanLabelReg(l) { const a = Math.abs(Math.round(l * 10) / 10); return (l >= 0 ? "D+" : "R+") + a; }
-function townHouseMargin(town) { const t = RES.races.house_2024.towns[town]; return t ? 100 * (t.d - t.r) / (t.d + t.r) : 0; }
+function townHouseMargin(town) { const t = HMAINrace && HMAINrace.towns[town]; return t ? 100 * (t.d - t.r) / (t.d + t.r) : 0; }
 function chipFor(cls) { const c = cls.toLowerCase();
   if (c.indexOf("persuasion") >= 0) return "PERSUADE";
   if (c.indexOf("turnout") >= 0 || c.indexOf("protect") >= 0 || c.indexOf("base") >= 0) return "GOTV";
@@ -494,26 +505,26 @@ function vhead(kick, kickCol, title, right) {
 
 /* ───────────────── THE VERDICT ───────────────── */
 ROUTES.verdict = function (view) {
-  const [rating, ratingCol] = rateFromMargin(H24.margin);
-  const decisive = Math.abs(RES.races.house_2024.towns.Bozrah ? (H24.r - H24.d) : 0);
-  const dec = Math.abs(H24.r - H24.d);
-  const decaprio24 = H24.r, win = winNumber;
-  const cleared = decaprio24 - win;
-  // win-bar fill: DeCaprio's 2024 share of two-party
-  const fill = 100 * decaprio24 / H24.two;
+  const TS = TARGET && TARGET.summary;
+  const [rating, ratingCol] = rateFromMargin(HMAIN.margin);
+  const dec = Math.abs(HMAIN.r - HMAIN.d);
+  const myV = myVotes, win = TARGET ? TARGET.win_number : winNumber;
+  const winBase = TARGET ? TARGET.planning_turnout : HMAIN.two;
+  const cleared = myV - win;
+  const fill = winBase ? 100 * myV / winBase : 0;
   // where the votes are (real universes)
-  const base = T.high_turnout, persu = T.party.Unaffiliated, regist = T.newly_registered;
+  const base = TS ? (TS.target_types["Base GOTV"] || 0) : T.high_turnout;
+  const persu = TS ? TS.persuasion_targets : T.party.Unaffiliated;
+  const regist = TS ? TS.dem_crossover_targets : T.newly_registered;
   const uSum = base + persu + regist;
   const pBase = base / uSum * 100, pPersu = persu / uSum * 100, pReg = regist / uSum * 100;
   // concentration
   const cp = corePrec().slice().sort((a, b) => b.active - a.active);
-  const totAct = cp.reduce((s, p) => s + p.active, 0);
+  const totAct = cp.reduce((s, p) => s + p.active, 0) || 1;
   let cum = 0, k = 0; for (const p of cp) { cum += p.active; k++; if (cum / totAct >= 0.6) break; }
   const concShare = Math.round(cum / totAct * 100);
-  // margin history rows
-  const hist = [
-    ["’20 P", P20.margin], ["’22 H", H22.margin], ["’24 P", P24.margin], ["’24 H", H24.margin],
-  ];
+  // margin history rows — built from whatever contested races are loaded, oldest → newest
+  const hist = (RES ? RES.order : []).map(kk => { const rc = RES.races[kk]; return ["’" + String(rc.year).slice(2) + " " + (rc.kind === "House" ? "H" : "P"), resTotals(rc).margin]; });
   const histRows = hist.map(([yr, m]) => {
     const d = m >= 0, w = Math.min(46, Math.abs(m) * 12 + 6), col = d ? "var(--dem)" : "var(--rep)", tc = d ? "var(--dem-lt)" : "var(--rep-lt)";
     return `<div style="display:flex;align-items:center;gap:8px;"><span class="num" style="width:34px;font-size:12px;color:var(--fg-muted);">${yr}</span>
@@ -525,7 +536,7 @@ ROUTES.verdict = function (view) {
   const gmax = Math.max(...gv) || 1; const spPts = gv.map((v, i) => `${8 + i * 96},${86 - (v / gmax) * 66}`);
 
   view.innerHTML =
-    vhead("Election Overview · 2026 Cycle", "var(--teal-lt)", "State Of The Race", "Model · " + C.generated_at.slice(0, 10) + " · SOTS file + 2020–24 returns") +
+    vhead("Election Overview · 2026 Cycle", "var(--teal-lt)", "State Of The Race", "Model · " + (TARGET ? TARGET.generated_at.slice(0, 10) + " · SOTS + L2 target model" : C.generated_at.slice(0, 10) + " · SOTS file + 2020–24 returns")) +
     `<div class="vrow" style="grid-template-columns:1.05fr 1fr 1fr;">
       <div class="vcard" style="border-color:var(--border-lt);padding:18px 20px;">
         <div class="h-card">Race Rating</div>
@@ -537,9 +548,9 @@ ROUTES.verdict = function (view) {
       <div class="vcard" style="padding:18px 20px;display:flex;flex-direction:column;">
         <div class="h-card">Votes To Win</div>
         <div class="num" style="font-size:52px;line-height:1;color:var(--fg);margin-top:4px;">${fmt(win)}</div>
-        <div class="lede" style="margin-top:2px;">50% + 1 of ${fmt(H24.two)} (2024 House turnout)</div>
+        <div class="lede" style="margin-top:2px;">50% + 1 of ${fmt(winBase)} ${TARGET ? "planning turnout" : "(" + myYear + " House turnout)"}</div>
         <div style="margin-top:auto;padding-top:20px;">
-          <div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span class="tag" style="color:var(--teal-lt);">DeCaprio ’24 · ${fmt(decaprio24)}</span><span class="tag" style="color:${cleared >= 0 ? "var(--teal-lt)" : "var(--rep-lt)"};">${cleared >= 0 ? "Cleared +" + fmt(cleared) : "Short " + fmt(-cleared)}</span></div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span class="tag" style="color:var(--teal-lt);">${myLast} ’${String(myYear).slice(2)} · ${fmt(myV)}</span><span class="tag" style="color:${cleared >= 0 ? "var(--teal-lt)" : "var(--rep-lt)"};">${cleared >= 0 ? "Cleared +" + fmt(cleared) : "Short " + fmt(-cleared)}</span></div>
           <div style="position:relative;height:16px;border-radius:8px;background:#0F1A2C;overflow:hidden;">
             <div style="position:absolute;inset:0 ${(100 - fill).toFixed(1)}% 0 0;background:linear-gradient(90deg,var(--teal),var(--teal-lt));"></div>
             <div style="position:absolute;top:0;bottom:0;left:50%;width:2px;background:var(--gold-lt);"></div>
@@ -548,17 +559,19 @@ ROUTES.verdict = function (view) {
         </div>
       </div>
       <div class="vcard" style="padding:18px 20px;">
-        <div class="h-card">Target Universes</div>
+        <div class="h-card">${TARGET ? "Target Universe" : "Target Universes"}</div>
+        ${TS ? `<div class="num" style="font-size:31px;line-height:1;margin-top:5px;color:var(--fg);">${fmt(TS.targets)}<span style="font-size:16px;color:var(--fg-muted);"> of ${fmt(TS.likely_voters)}</span></div>` : ""}
         <div style="display:flex;height:28px;border-radius:var(--r-lg);overflow:hidden;margin-top:12px;">
           <div class="num" style="width:${pBase}%;background:var(--teal);display:flex;align-items:center;justify-content:center;color:#04181c;font-size:12px;">${fmtK(base)}</div>
           <div class="num" style="width:${pPersu}%;background:var(--gold);display:flex;align-items:center;justify-content:center;color:#241a02;font-size:12px;">${fmtK(persu)}</div>
           <div class="num" style="width:${pReg}%;background:var(--npa);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;">${fmtK(regist)}</div>
         </div>
         <div style="margin-top:15px;display:flex;flex-direction:column;gap:10px;">
-          <div style="display:flex;align-items:center;gap:9px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--teal);flex-shrink:0;"></span><span class="tag" style="color:var(--fg);">High-turnout base</span><span class="num" style="margin-left:auto;color:var(--teal-lt);">${Math.round(pBase)}%</span></div>
-          <div style="display:flex;align-items:center;gap:9px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--gold);flex-shrink:0;"></span><span class="tag" style="color:var(--fg);">Unaffiliated persuasion</span><span class="num" style="margin-left:auto;color:var(--gold-lt);">${Math.round(pPersu)}%</span></div>
-          <div style="display:flex;align-items:center;gap:9px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--npa);flex-shrink:0;"></span><span class="tag" style="color:var(--fg);">Newly registered</span><span class="num" style="margin-left:auto;color:var(--npa-lt);">${Math.round(pReg)}%</span></div>
+          <div style="display:flex;align-items:center;gap:9px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--teal);flex-shrink:0;"></span><span class="tag" style="color:var(--fg);">${TARGET ? "Base GOTV" : "High-turnout base"}</span><span class="num" style="margin-left:auto;color:var(--teal-lt);">${Math.round(pBase)}%</span></div>
+          <div style="display:flex;align-items:center;gap:9px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--gold);flex-shrink:0;"></span><span class="tag" style="color:var(--fg);">${TARGET ? "Persuasion" : "Unaffiliated persuasion"}</span><span class="num" style="margin-left:auto;color:var(--gold-lt);">${Math.round(pPersu)}%</span></div>
+          <div style="display:flex;align-items:center;gap:9px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--npa);flex-shrink:0;"></span><span class="tag" style="color:var(--fg);">${TARGET ? "Weak D crossover" : "Newly registered"}</span><span class="num" style="margin-left:auto;color:var(--npa-lt);">${Math.round(pReg)}%</span></div>
         </div>
+        ${TARGET ? `<a class="chip" style="margin-top:14px;" href="#targets">Open Targets</a>` : ""}
       </div>
     </div>
 
@@ -579,7 +592,7 @@ ROUTES.verdict = function (view) {
       <div style="background:linear-gradient(160deg,rgba(124,58,237,.14),rgba(15,33,64,.4));border:1px solid rgba(124,58,237,.34);border-radius:var(--r-lg);padding:20px;">
         <div class="kicker" style="color:var(--npa-lt);">03 · The Voters</div>
         <div class="num" style="font-size:48px;line-height:1;margin-top:6px;">${fmt(persu)}</div>
-        <div class="kicker" style="margin-top:2px;">Persuadable unaffiliateds</div>
+        <div class="kicker" style="margin-top:2px;">${TARGET ? "Modeled persuasion targets" : "Persuadable unaffiliateds"}</div>
         <div class="tag" style="display:block;margin-top:14px;color:var(--fg);">The swing, not the base.</div>
       </div>
     </div>
@@ -596,9 +609,9 @@ ROUTES.verdict = function (view) {
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;">
         <div style="background:var(--navy-card);padding:13px 16px;"><div class="h-card">Active Reg.</div><div class="num" style="font-size:23px;margin-top:4px;">${fmt(T.active)}</div></div>
-        <div style="background:var(--navy-card);padding:13px 16px;"><div class="h-card">2024 Turnout</div><div class="num" style="font-size:23px;margin-top:4px;color:var(--teal-lt);">${fmt(H24.two)}</div></div>
-        <div style="background:var(--navy-card);padding:13px 16px;"><div class="h-card">Win Number</div><div class="num" style="font-size:23px;margin-top:4px;color:var(--gold-lt);">${fmt(win)}</div></div>
-        <div style="background:var(--navy-card);padding:13px 16px;"><div class="h-card">DeCaprio ’24</div><div class="num" style="font-size:23px;margin-top:4px;">${fmt(decaprio24)}</div></div>
+        <div style="background:var(--navy-card);padding:13px 16px;"><div class="h-card">${myYear} Turnout</div><div class="num" style="font-size:23px;margin-top:4px;color:var(--teal-lt);">${fmt(HMAIN.two)}</div></div>
+        <div style="background:var(--navy-card);padding:13px 16px;"><div class="h-card">${TARGET ? "2026 Win Number" : "Win Number"}</div><div class="num" style="font-size:23px;margin-top:4px;color:var(--gold-lt);">${fmt(win)}</div></div>
+        <div style="background:var(--navy-card);padding:13px 16px;"><div class="h-card">${myLast} ’${String(myYear).slice(2)}</div><div class="num" style="font-size:23px;margin-top:4px;">${fmt(myV)}</div></div>
       </div>
     </div>
     <div class="vbanner"><span class="tag" style="font-size:10px;color:var(--gold);">Note</span><span class="kicker" style="text-transform:none;letter-spacing:0;font-family:var(--ff-body);font-size:10.5px;">Registration, turnout & results are from the CT SOTS file and certified returns. The win number and target universes are projections for planning.</span></div>`;
@@ -678,7 +691,7 @@ ROUTES.battlefield = function (view) {
     </div>`;
 
   view.querySelectorAll("#prows .prow").forEach(el => el.onclick = () => { battleSel = +el.dataset.i; route(); });
-  setTimeout(() => resultsMap("bmap", RES.races.house_2024, null), 30);
+  setTimeout(() => resultsMap("bmap", HMAINrace, null), 30);
 };
 
 /* ───────────────── THE PLAN ───────────────── */
@@ -687,7 +700,7 @@ ROUTES.plan = function (view) {
   const totAct = cp.reduce((s, p) => s + p.active, 0);
   let cum = 0, k = 0; for (const p of cp) { cum += p.active; k++; if (cum / totAct >= 0.6) break; }
   const conc = Math.round(cum / totAct * 100);
-  const dec = Math.abs(H24.r - H24.d);
+  const dec = Math.abs(HMAIN.r - HMAIN.d);
   const C0 = 263.9; // donut circumference
   const alloc = [["Field", 38, "var(--teal)", "var(--teal-lt)"], ["Mail", 27, "var(--gold)", "var(--gold-lt)"], ["Digital", 22, "var(--npa)", "var(--npa-lt)"], ["Data", 13, "var(--fg-muted)", "var(--fg-dim)"]];
   let off = 0; const arcs = alloc.map(([, pc, col]) => { const len = pc / 100 * C0; const s = `<circle cx="50" cy="50" r="42" fill="none" stroke="${col}" stroke-width="15" stroke-dasharray="${len.toFixed(1)} ${C0}" stroke-dashoffset="${(-off).toFixed(1)}"></circle>`; off += len; return s; }).join("");
