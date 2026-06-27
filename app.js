@@ -725,20 +725,27 @@ ROUTES.plan = function (view) {
 
 /* ───────────────── GEOGRAPHY · TOWN & PRECINCT ───────────────── */
 let geoMode = "town";
+/* fixed-domain metrics — color is anchored to absolute thresholds, so a small
+   real gap reads as a small visual gap (no min/max stretching). */
+function gSeq(v, lo, hi, base) { const t = Math.max(0, Math.min(1, (v - lo) / (hi - lo))); const f = [20, 32, 50]; return `rgb(${f.map((c, i) => Math.round(c + (base[i] - c) * (0.16 + 0.84 * t))).join(",")})`; }
+const GEOM = {
+  lean:    { label: "Registration lean", get: t => t.party_pct.Democratic - t.party_pct.Republican, fmt: v => (v >= 0 ? "D+" : "R+") + (Math.round(Math.abs(v) * 10) / 10), color: v => colorForMargin(v), anchors: [["var(--safe-r)", "R+15"], ["var(--tossup)", "Even"], ["var(--safe-d)", "D+15"]] },
+  unaff:   { label: "Persuasion pool", get: t => t.party_pct.Unaffiliated, fmt: pc1, color: v => gSeq(v, 30, 50, [167, 139, 250]), anchors: [["#2c2942", "30%"], ["#A78BFA", "50%"]] },
+  turnout: { label: "Turnout risk", get: t => pct(t.tier.Low + t.tier.None, t.active), fmt: pc1, color: v => gSeq(v, 8, 40, [240, 184, 42]), anchors: [["#2c2a1d", "8%"], ["#F0B82A", "40%+"]] },
+  size:    { label: "Active voters", get: t => t.active, fmt: fmt, color: v => gSeq(v, 0, 5500, [34, 170, 188]), anchors: [["#16313b", "fewer"], ["#22AABC", "more"]] },
+};
 ROUTES.geography = function (view) {
-  const m = GEO_METRICS[geoMetric];
-  const metricKeys = [["republican_share", "R Share"], ["unaffiliated_share", "Unaff."], ["turnout_gap", "Low-Turnout"], ["active", "Active"]];
+  if (!GEOM[geoMetric]) geoMetric = "lean";
+  const m = GEOM[geoMetric];
+  const metricKeys = [["lean", "Lean"], ["unaff", "Persuasion"], ["turnout", "Turnout"], ["size", "Size"]];
   const seg = metricKeys.map(([k, lab]) => `<button class="seg-btn ${k === geoMetric ? "on" : ""}" data-k="${k}">${lab}</button>`).join("");
   const modeSeg = [["town", "Town"], ["precinct", "Precinct"]].map(([k, lab]) => `<button class="seg-btn ${k === geoMode ? "on" : ""}" data-m="${k}">${lab}</button>`).join("");
 
   const towns = townList();
-  const tvals = towns.map(t => m.get(t)); const tmin = Math.min(...tvals), tmax = Math.max(...tvals);
   const precs = corePrec();
-  const pvals = precs.map(p => m.get(p)); const pmin = Math.min(...pvals), pmax = Math.max(...pvals);
-
   const list = geoMode === "town"
-    ? towns.map(t => ({ name: t.name, v: m.get(t), sub: fmt(t.active) + " act", col: rampColor(m.get(t), tmin, tmax, m.ramp), kind: "town", obj: t }))
-    : precs.map(p => ({ name: p.name, v: m.get(p), sub: fmt(p.active) + " act", col: rampColor(m.get(p), pmin, pmax, m.ramp), kind: "precinct", obj: p }));
+    ? towns.map(t => ({ name: t.name, v: m.get(t), sub: fmt(t.active) + " act", col: m.color(m.get(t)), kind: "town", obj: t }))
+    : precs.map(p => ({ name: p.name, v: m.get(p), sub: fmt(p.active) + " act", col: m.color(m.get(p)), kind: "precinct", obj: p }));
   const listRows = list.map((r, i) => `<div class="prow" data-i="${i}"><span style="width:12px;height:12px;border-radius:3px;background:${r.col};flex-shrink:0;"></span>
     <span class="num" style="font-size:15px;flex:1;">${r.name}</span><span class="num" style="color:var(--gold-lt);">${m.fmt(r.v)}</span>
     <span class="kicker" style="width:56px;text-align:right;">${r.sub}</span></div>`).join("");
@@ -781,12 +788,9 @@ function geoMap(id, m, mode, legendId) {
   L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png", { maxZoom: 18, pane: "markerPane" }).addTo(map);
   map.fitBounds(GEO.bounds, { padding: [18, 18] });
   (window._maps = window._maps || []).push(map);
-  let min, max;
   if (mode === "town") {
-    const vals = GEO.towns.features.map(f => { const t = TOWNS[f.properties.town]; return t ? m.get(t) : 0; });
-    min = Math.min(...vals); max = Math.max(...vals);
     const layer = L.geoJSON(GEO.towns, {
-      style: f => { const t = TOWNS[f.properties.town]; const v = t ? m.get(t) : 0; return { fillColor: rampColor(v, min, max, m.ramp), fillOpacity: .88, color: "#06111F", weight: 1.2 }; },
+      style: f => { const t = TOWNS[f.properties.town]; return { fillColor: t ? m.color(m.get(t)) : "#0F1A2C", fillOpacity: .85, color: "#06111F", weight: 1.2 }; },
       onEachFeature: (f, lyr) => { const t = TOWNS[f.properties.town]; if (!t) return;
         lyr.bindTooltip(`<b>${t.name}</b><br>${m.label}: ${m.fmt(m.get(t))}<br>${fmt(t.active)} active`, { sticky: true });
         lyr.on({ mouseover: e => e.target.setStyle({ weight: 3, color: "#22AABC" }), mouseout: e => layer.resetStyle(e.target), click: () => drillTown(t, "town") });
@@ -795,17 +799,16 @@ function geoMap(id, m, mode, legendId) {
   } else {
     L.geoJSON(GEO.towns, { style: { fillColor: "#0F1A2C", fillOpacity: .4, color: "rgba(255,255,255,.13)", weight: 1 } }).addTo(map);
     const precs = corePrec();
-    const vals = precs.map(p => m.get(p)); min = Math.min(...vals); max = Math.max(...vals);
     const amax = Math.max(...precs.map(p => p.active));
     const cent = townCentroids(); const byTown = {};
     precs.forEach(p => { const t = precTown(p); (byTown[t] = byTown[t] || []).push(p); });
     Object.entries(byTown).forEach(([town, ps]) => {
       const c = cent[town]; if (!c) return;
       ps.forEach((p, i) => {
-        const off = ps.length > 1 ? 0.019 : 0, ang = (i / ps.length) * 2 * Math.PI;
+        const off = ps.length > 1 ? 0.02 : 0, ang = (i / ps.length) * 2 * Math.PI;
         const ll = [c[0] + off * Math.cos(ang), c[1] + off * Math.sin(ang) * 1.4];
-        const rad = 9 + 13 * (p.active / amax);
-        const mk = L.circleMarker(ll, { radius: rad, fillColor: rampColor(m.get(p), min, max, m.ramp), fillOpacity: .92, color: "#06111F", weight: 1.5 });
+        const rad = 8 + 16 * Math.sqrt(p.active / amax); // area ∝ voters
+        const mk = L.circleMarker(ll, { radius: rad, fillColor: m.color(m.get(p)), fillOpacity: .9, color: "#06111F", weight: 1.5 });
         mk.bindTooltip(`<b>${p.name}</b><br>${m.label}: ${m.fmt(m.get(p))}<br>${fmt(p.active)} active`, { sticky: true });
         mk.on("click", () => drillTown(p, "precinct"));
         mk.on("mouseover", () => mk.setStyle({ weight: 3, color: "#22AABC" }));
@@ -815,9 +818,8 @@ function geoMap(id, m, mode, legendId) {
     });
   }
   const lg = legendId && document.getElementById(legendId);
-  if (lg) lg.innerHTML = `<span class="muted">${m.label}:</span>` +
-    `<span><i style="background:${rampColor(min, min, max, m.ramp)}"></i>${m.fmt(min)}</span>` +
-    `<span><i style="background:${rampColor(max, min, max, m.ramp)}"></i>${m.fmt(max)}</span>`;
+  if (lg) lg.innerHTML = `<span class="muted">${m.label}</span>` +
+    m.anchors.map(([c, l]) => `<span><i style="background:${c}"></i>${l}</span>`).join("");
 }
 
 /* ============================ DRILL-DOWN (aggregate) ============================ */
