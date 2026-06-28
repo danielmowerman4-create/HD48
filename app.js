@@ -51,8 +51,13 @@ function buildNav() {
 
 /* ---- router ---- */
 const ROUTES = {};
+const ROUTE_ALIASES = {
+  datahealth: "targets",
+  map: "geography",
+};
 function route() {
-  const r = (location.hash.replace("#", "") || "verdict").split("/")[0];
+  const raw = (location.hash.replace("#", "") || "verdict").split("/")[0];
+  const r = ROUTE_ALIASES[raw] || raw;
   document.querySelectorAll(".tab").forEach(a => a.classList.toggle("active", a.dataset.route === r));
   const meta = NAV.find(x => x[0] === r) || NAV[0];
   $("#t-title").textContent = meta[1];
