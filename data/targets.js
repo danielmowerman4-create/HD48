@@ -49,7 +49,7 @@ window.TARGET_UNIVERSE = {
       "label": "Democratic crossover summary"
     }
   ],
-  "generated_at": "2026-06-27T15:50:25",
+  "generated_at": "2026-06-27T15:52:50",
   "model": "HD48 2026 general-election likely-voter and target universe",
   "notes": [
     "Likely voters are turnout tiers Very High, High, and Medium.",

@@ -617,6 +617,100 @@ ROUTES.verdict = function (view) {
     <div class="vbanner"><span class="tag" style="font-size:10px;color:var(--gold);">Note</span><span class="kicker" style="text-transform:none;letter-spacing:0;font-family:var(--ff-body);font-size:10.5px;">Registration, turnout & results are from the CT SOTS file and certified returns. The win number and target universes are projections for planning.</span></div>`;
 };
 
+/* ───────────────── TARGETS ───────────────── */
+ROUTES.targets = function (view) {
+  if (!TARGET) {
+    view.innerHTML = vhead("Target Universe", "var(--gold-lt)", "Targets Not Loaded", "Run build/import_targets.py") +
+      `<div class="note info"><div>Target model data is not loaded yet. Run <code>python3 build/import_targets.py</code>, then refresh.</div></div>`;
+    return;
+  }
+  const s = TARGET.summary;
+  const partyName = p => (TARGET.party_labels && TARGET.party_labels[p]) || p;
+  const entries = obj => Object.entries(obj || {}).sort((a, b) => b[1] - a[1]);
+  const rowBar = (label, n, total, color) => {
+    const w = total ? Math.max(2, 100 * n / total) : 0;
+    return `<div style="display:grid;grid-template-columns:minmax(160px,1fr) 74px 1.2fr;gap:12px;align-items:center;">
+      <span class="tag" style="color:var(--fg);">${label}</span>
+      <span class="num" style="text-align:right;color:${color};">${fmt(n)}</span>
+      <span class="scorebar" style="margin:0;"><i style="width:${w}%;background:${color};"></i></span>
+    </div>`;
+  };
+  const typeColors = ["var(--teal-lt)", "var(--gold-lt)", "var(--npa-lt)", "var(--dem-lt)", "var(--fg-muted)"];
+  const typeRows = entries(s.target_types).map(([k, v], i) => rowBar(k, v, s.targets, typeColors[i] || "var(--fg-muted)")).join("");
+  const partyRows = entries(s.parties).map(([k, v], i) => rowBar(partyName(k), v, s.targets, typeColors[i] || "var(--fg-muted)")).join("");
+  const notRows = entries(s.not_targeted_parties).map(([k, v], i) => rowBar(partyName(k), v, s.not_targeted, typeColors[i] || "var(--fg-muted)")).join("");
+  const demRows = entries(s.dem_crossover_priorities).map(([k, v], i) => rowBar(k.replace(" - ", " "), v, s.dem_crossover_targets, typeColors[i] || "var(--fg-muted)")).join("");
+  const townRows = TARGET.towns.map(t => `<tr>
+    <td class="nm">${t.town}</td>
+    <td class="num">${fmt(t.likely)}</td>
+    <td class="num">${fmt(t.targets)}</td>
+    <td class="num">${pc1(t.target_rate)}</td>
+    <td class="num">${fmt(t.persuasion)}</td>
+    <td class="num">${fmt(t.dem_crossover)}</td>
+    <td class="num">${fmt(t.u_it_not_targeted)}</td>
+  </tr>`).join("");
+  const exportLinks = (TARGET.exports || []).map(x => `<a class="chip" href="${x.href}" download>${x.label}</a>`).join("");
+
+  view.innerHTML =
+    vhead("2026 General Election", "var(--gold-lt)", "Target Universe", "Generated " + TARGET.generated_at.replace("T", " · ").slice(0, 21)) +
+    `<div class="vrow" style="grid-template-columns:repeat(4,1fr);">
+      <div class="vcard" style="padding:16px 18px;"><div class="h-card">Likely Voter Pool</div><div class="num" style="font-size:38px;line-height:1;margin-top:5px;">${fmt(s.likely_voters)}</div><div class="lede">Very High, High and Medium tiers</div></div>
+      <div class="vcard" style="padding:16px 18px;"><div class="h-card">Planning Turnout</div><div class="num" style="font-size:38px;line-height:1;margin-top:5px;color:var(--teal-lt);">${fmt(TARGET.planning_turnout)}</div><div class="lede">Campaign planning assumption</div></div>
+      <div class="vcard" style="padding:16px 18px;"><div class="h-card">Win Number</div><div class="num" style="font-size:38px;line-height:1;margin-top:5px;color:var(--gold-lt);">${fmt(TARGET.win_number)}</div><div class="lede">50% + 1 of planning turnout</div></div>
+      <div class="vcard" style="padding:16px 18px;"><div class="h-card">One Target Universe</div><div class="num" style="font-size:38px;line-height:1;margin-top:5px;color:var(--npa-lt);">${fmt(s.targets)}</div><div class="lede">${pc1(s.target_rate)} of likely pool</div></div>
+    </div>
+
+    <div class="vrow" style="grid-template-columns:1.1fr 1fr;margin-top:14px;">
+      <div class="vcard" style="padding:18px 20px;">
+        <div class="h-card" style="margin-bottom:12px;">Target Type Mix</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">${typeRows}</div>
+      </div>
+      <div class="vcard" style="padding:18px 20px;">
+        <div class="h-card" style="margin-bottom:12px;">Target Party Mix</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">${partyRows}</div>
+      </div>
+    </div>
+
+    <div class="vrow" style="grid-template-columns:1fr 1fr;margin-top:14px;">
+      <div class="vcard" style="padding:18px 20px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;"><span class="h-card">Persuasion Core</span><span class="num" style="color:var(--gold-lt);">${fmt(s.persuasion_targets)}</span></div>
+        <div class="lede">Lean-support and true-swing voters after removing U/IT voters with Democratic or liberal evidence.</div>
+        <div style="margin-top:12px;display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;">
+          <div style="background:var(--navy-card);padding:12px 14px;"><div class="h-card">U/IT Not Targeted</div><div class="num" style="font-size:24px;color:var(--rep-lt);">${fmt(s.u_it_not_targeted)}</div></div>
+          <div style="background:var(--navy-card);padding:12px 14px;"><div class="h-card">Not Targeted Overall</div><div class="num" style="font-size:24px;color:var(--fg-muted);">${fmt(s.not_targeted)}</div></div>
+        </div>
+      </div>
+      <div class="vcard" style="padding:18px 20px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;"><span class="h-card">Weak D Crossover</span><span class="num" style="color:var(--dem-lt);">${fmt(s.dem_crossover_targets)}</span></div>
+        <div style="display:flex;flex-direction:column;gap:10px;">${demRows}</div>
+      </div>
+    </div>
+
+    <div class="vrow" style="grid-template-columns:1.3fr 1fr;margin-top:14px;">
+      <div class="vcard" style="padding:18px 20px;">
+        <div class="h-card" style="margin-bottom:12px;">Town Breakdown</div>
+        <div class="tbl-wrap"><table><thead><tr><th>Town</th><th class="num">Likely</th><th class="num">Targets</th><th class="num">Rate</th><th class="num">Persuasion</th><th class="num">Weak D</th><th class="num">U/IT Out</th></tr></thead><tbody>${townRows}</tbody></table></div>
+      </div>
+      <div class="vcard" style="padding:18px 20px;">
+        <div class="h-card" style="margin-bottom:12px;">Not Targeted Party Audit</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">${notRows}</div>
+        <div style="height:1px;background:var(--border);margin:16px 0;"></div>
+        <div class="h-card" style="margin-bottom:8px;">L2 Coverage</div>
+        <div class="dl">
+          <dt>Likely voters matched</dt><dd>${fmt(s.l2_match.likely)}</dd>
+          <dt>Targets matched</dt><dd>${fmt(s.l2_match.targets)}</dd>
+          <dt>Weak D matched</dt><dd>${fmt(s.l2_match.dem_crossover)}</dd>
+        </div>
+      </div>
+    </div>
+
+    <div class="vcard" style="padding:18px 20px;margin-top:14px;">
+      <div class="h-card" style="margin-bottom:12px;">Exports</div>
+      <div style="display:flex;gap:9px;flex-wrap:wrap;">${exportLinks}</div>
+    </div>
+    <div class="vbanner"><span class="tag" style="font-size:10px;color:var(--gold);">Model Note</span><span class="kicker" style="text-transform:none;letter-spacing:0;font-family:var(--ff-body);font-size:10.5px;">${TARGET.notes.join(" ")}</span></div>`;
+};
+
 /* ───────────────── BATTLEFIELD ───────────────── */
 let battleSel = 0;
 ROUTES.battlefield = function (view) {
