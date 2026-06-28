@@ -7,11 +7,11 @@ Likely 2026 voters are defined as voters in turnout tiers `Very High`, `High`, o
 - Likely 2026 voter universe: 12,030
 - Expected turnout represented by likely universe: 10,610
 - Modeled Republican-side support votes inside likely universe: 5,252
-- Republican-leaning likely voters: 5,433
-- All likely-voter targets: 7,953
-- Likely persuasion targets: 4,157
+- Republican-leaning likely voters: 5,432
+- All likely-voter targets: 7,956
+- Likely persuasion targets: 4,162
 - Likely weak-D targets: 208
-- Likely unaffiliated/Independent not targeted: 610
+- Likely unaffiliated/Independent not targeted: 607
 
 ## Practical Read
 
@@ -22,33 +22,33 @@ Likely 2026 voters are defined as voters in turnout tiers `Very High`, `High`, o
 
 ## Likely Universe by Support Lean
 
-- Swing / Unknown: 2,540
-- Lean Opposition: 2,442
-- Lean Support: 2,131
-- Soft Support: 1,844
-- Strong Support: 1,458
-- Strong Opposition: 1,219
-- Soft Opposition: 396
+- Swing / Unknown: 2,544
+- Lean Opposition: 2,441
+- Lean Support: 2,130
+- Soft Support: 1,845
+- Strong Support: 1,457
+- Strong Opposition: 1,220
+- Soft Opposition: 393
 
 ## Likely Universe by Target Type
 
 - Opposition / Exclude: 3,661
-- Base GOTV: 3,589
-- True Swing Persuasion: 2,540
-- Lean Support Persuasion/GOTV: 1,844
-- Crossover / Soft Opposition Persuasion: 354
+- Base GOTV: 3,587
+- True Swing Persuasion: 2,544
+- Lean Support Persuasion/GOTV: 1,845
+- Crossover / Soft Opposition Persuasion: 351
 - Low Info / Low Priority: 42
 
 ## Likely Targets by Target Type
 
-- Base GOTV: 3,588
-- True Swing Persuasion: 2,344
-- Lean Support Persuasion/GOTV: 1,813
+- Base GOTV: 3,586
+- True Swing Persuasion: 2,348
+- Lean Support Persuasion/GOTV: 1,814
 - Weak Democrat Persuasion: 208
 
 ## Likely Targets by Party
 
-- U: 4,109
+- U: 4,112
 - R: 3,451
 - D: 208
 - IT: 159
@@ -58,36 +58,36 @@ Likely 2026 voters are defined as voters in turnout tiers `Very High`, `High`, o
 ## Republican-Leaning Likely Voters by Party
 
 - R: 3,446
-- U: 1,888
+- U: 1,887
 - IT: 81
 - L: 17
 - D: 1
 
 ## Unaffiliated/Independent Not Targeted by Town
 
-- Colchester: 420
+- Colchester: 417
 - Lebanon: 107
 - Bozrah: 49
 - Franklin: 34
 
 ## Weak-D Evidence
 
-- no Democratic primary history: 167
+- no Democratic primary history: 166
 - Republican-performing geography: 140
-- mixed Democratic/Republican household: 111
-- Democratic household: 76
+- mixed Democratic/Republican household: 112
+- Democratic household: 75
 - weak conservative context: 71
 - Democratic-performing geography: 68
-- positive weak-feature ensemble: 49
+- positive weak-feature ensemble: 48
 - GOP primary history: 39
 - soft opposition only: 36
 - one Democratic primary: 34
 - strong weak-feature ensemble: 24
 - Republican household: 15
 - soft negative weak-feature ensemble: 13
-- multiple Democratic primaries: 7
+- multiple Democratic primaries: 8
+- negative weak-feature ensemble: 6
 - conservative issue signal: 6
-- negative weak-feature ensemble: 5
 - modeled swing: 4
 - conservative donor/FEC: 4
 - liberal issue signal: 3

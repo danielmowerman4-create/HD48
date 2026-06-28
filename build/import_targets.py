@@ -32,6 +32,9 @@ FILES = {
     "u_it_not_targeted": "hd48_2026_likely_unaffiliated_not_targeted.csv",
     "target_summary": "hd48_2026_likely_voter_target_summary.md",
     "dem_summary": "hd48_2026_likely_democrat_crossover_targets_summary.md",
+    "l2_reconciliation": "hd48_l2_sos_reconciliation.csv",
+    "l2_reconciliation_summary": "hd48_l2_sos_reconciliation_summary.md",
+    "l2_match_ceiling": "hd48_l2_sos_match_ceiling.md",
 }
 
 PARTY_LABELS = {
@@ -108,6 +111,9 @@ def copy_exports(source: Path) -> list[dict[str, str]]:
         "u_it_not_targeted": "Unaffiliated/Independent not targeted",
         "target_summary": "Target universe summary",
         "dem_summary": "Democratic crossover summary",
+        "l2_reconciliation": "L2/SOTS reconciliation audit",
+        "l2_reconciliation_summary": "L2/SOTS reconciliation summary",
+        "l2_match_ceiling": "L2/SOTS match ceiling",
     }
     for key, filename in FILES.items():
         src = source / filename
