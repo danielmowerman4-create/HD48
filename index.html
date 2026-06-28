@@ -355,6 +355,8 @@ canvas{max-width:100%}
 .vcard{background:var(--navy-card);border:1px solid var(--border);border-radius:8px}
 .vhead{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
 .vrow{display:grid;gap:14px}
+.metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);
+  border-radius:var(--r-md);overflow:hidden;margin-top:14px}
 .vbanner{display:flex;align-items:center;gap:12px;padding:9px 16px;border-radius:var(--r-md);
   background:rgba(212,160,23,.07);border:1px solid rgba(212,160,23,.22);margin-top:22px}
 .prow{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:var(--r-md);cursor:pointer;
@@ -374,6 +376,7 @@ canvas{max-width:100%}
   .header{padding:0 16px;gap:10px}.brand{font-size:18px;letter-spacing:2px}.h-title,.h-div{display:none}
   .view{padding:18px 16px 56px}
   .vrow{grid-template-columns:1fr!important}
+  .metric-grid{grid-template-columns:1fr 1fr}
 }
 </style>
 </head>
@@ -422,7 +425,7 @@ canvas{max-width:100%}
 <script src="data/precincts.js?v=10"></script>
 <script src="data/health.js?v=10"></script>
 <script src="data/geometry.js?v=10"></script>
-<script src="data/targets.js?v=10"></script>
-<script src="app.js?v=10"></script>
+<script src="data/targets.js?v=11"></script>
+<script src="app.js?v=11"></script>
 </body>
 </html>

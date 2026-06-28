@@ -34,12 +34,10 @@ const precList = () => Object.values(PREC).filter(p => p.active > 5).sort((a, b)
 
 /* ---- nav ---- */
 const NAV = [
-  ["verdict", "The Verdict"],
-  ["battlefield", "Battlefield"],
+  ["verdict", "Verdict"],
   ["targets", "Targets"],
-  ["geography", "Geography"],
+  ["geography", "Map"],
   ["results", "Results"],
-  ["turnout", "Turnout"],
 ];
 function buildNav() {
   const n = $("#nav");
@@ -399,6 +397,22 @@ ROUTES.results = function (view) {
      <div><div class="lab">Margin</div><div class="val ${win}">${marginLabel(tot.margin)}</div><div class="sub">swing ${swingTxt}</div></div>`;
   view.appendChild(sum);
 
+  const g = C.gen_years || {};
+  const years = [2018, 2020, 2022, 2024];
+  const maxTurnout = Math.max(...years.map(y => g[y] || 0)) || 1;
+  const turnoutRows = years.map(y => {
+    const v = g[y] || 0;
+    const mid = y === 2018 || y === 2022;
+    return `<div style="background:var(--navy-card);padding:13px 16px;">
+      <div class="h-card">${y} ${mid ? "Midterm" : "Presidential"}</div>
+      <div class="num" style="font-size:25px;margin-top:4px;color:${mid ? "var(--gold-lt)" : "var(--teal-lt)"};">${fmt(v)}</div>
+      <div class="scorebar"><i style="width:${Math.round(100 * v / maxTurnout)}%;background:${mid ? "var(--gold)" : "var(--teal)"};"></i></div>
+    </div>`;
+  }).join("");
+  const turnout = el("div");
+  turnout.innerHTML = `<div class="metric-grid">${turnoutRows}</div>`;
+  view.appendChild(turnout);
+
   // map + town results
   const row = el("div", "grid"); row.style.gridTemplateColumns = "1.5fr 1fr"; row.style.marginTop = "22px"; row.style.alignItems = "start";
   const mapCard = el("div", "card pad");
@@ -649,6 +663,17 @@ ROUTES.targets = function (view) {
     <td class="num">${fmt(t.dem_crossover)}</td>
     <td class="num">${fmt(t.u_it_not_targeted)}</td>
   </tr>`).join("");
+  const priorityRows = corePrec().slice().sort((a, b) => netOpp(b) - netOpp(a)).slice(0, 5).map((p, i) => {
+    const lean = p.party_pct.Democratic - p.party_pct.Republican;
+    return `<tr>
+      <td class="nm">${i + 1}. ${p.name}</td>
+      <td>${precTown(p)}</td>
+      <td class="num">${fmt(p.active)}</td>
+      <td class="num">${leanLabelReg(lean)}</td>
+      <td class="num">${fmt(netOpp(p))}</td>
+      <td><span style="${chipStyle(chipFor(p.opportunity.class))}">${chipFor(p.opportunity.class)}</span></td>
+    </tr>`;
+  }).join("");
   const exportLinks = (TARGET.exports || []).map(x => `<a class="chip" href="${x.href}" download>${x.label}</a>`).join("");
 
   view.innerHTML =
@@ -702,6 +727,11 @@ ROUTES.targets = function (view) {
           <dt>Weak D matched</dt><dd>${fmt(s.l2_match.dem_crossover)}</dd>
         </div>
       </div>
+    </div>
+
+    <div class="vcard" style="padding:18px 20px;margin-top:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;"><span class="h-card">Priority Precinct Lens</span><span class="kicker" style="color:var(--gold-lt);">Top five by net opportunity</span></div>
+      <div class="tbl-wrap"><table><thead><tr><th>Precinct</th><th>Town</th><th class="num">Active</th><th class="num">Reg. lean</th><th class="num">Net opp.</th><th>Program</th></tr></thead><tbody>${priorityRows}</tbody></table></div>
     </div>
 
     <div class="vcard" style="padding:18px 20px;margin-top:14px;">
