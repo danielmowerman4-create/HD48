@@ -65,6 +65,7 @@ function route() {
   });
   const meta = NAV.find(x => x[0] === r) || NAV[0];
   $("#t-title").textContent = meta[1];
+  $("#view").className = "view route-" + r;
   $("#view").innerHTML = "";
   window._charts && window._charts.forEach(c => c.destroy()); window._charts = [];
   window._maps && window._maps.forEach(m => { try { m.remove(); } catch (e) {} }); window._maps = [];
@@ -656,7 +657,7 @@ ROUTES.analysis = function (view) {
   const top = (obj, n) => Object.entries(obj || {}).sort((a, b) => b[1] - a[1]).slice(0, n || 6);
   const barRows = (obj, total, color) => top(obj, 8).map(([k, v]) => {
     const w = total ? Math.max(2, 100 * v / total) : 0;
-    return `<div style="display:grid;grid-template-columns:minmax(130px,1fr) 58px 1.1fr;gap:10px;align-items:center;">
+    return `<div style="display:grid;grid-template-columns:minmax(160px,1fr) 72px 1.2fr;gap:12px;align-items:center;">
       <span class="tag" style="color:var(--fg);">${k}</span><span class="num" style="text-align:right;color:${color};">${fmt(v)}</span>
       <span class="scorebar" style="margin:0;"><i style="width:${w}%;background:${color};"></i></span></div>`;
   }).join("");
@@ -680,43 +681,46 @@ ROUTES.analysis = function (view) {
   }).join("");
   const metricBtns = mapMetrics.map(m => `<button class="seg-btn ${m.key === analysisMetric ? "on" : ""}" data-analysis-metric="${m.key}">${m.label}</button>`).join("");
   const mapTownRows = ((A.map && A.map.towns) || []).slice().sort((a, b) => (b[analysisMetric] || 0) - (a[analysisMetric] || 0)).map(t =>
-    `<div class="prow" role="button" tabindex="0" data-town="${t.town}"><span class="num" style="font-size:15px;flex:1;">${t.town}</span><span class="num" style="color:var(--gold-lt);">${pc1(t[analysisMetric] || 0)}</span><span class="kicker" style="width:70px;text-align:right;">${fmt(t.targets)} tgt</span></div>`
+    `<div class="prow" role="button" tabindex="0" data-town="${t.town}"><span class="num" style="flex:1;">${t.town}</span><span class="num" style="color:var(--gold-lt);">${pc1(t[analysisMetric] || 0)}</span><span class="kicker" style="width:82px;text-align:right;">${fmt(t.targets)} tgt</span></div>`
   ).join("");
 
   view.innerHTML =
     vhead("Fixed Universe", "var(--gold-lt)", "Analysis", "Aggregate SOTS + L2") +
     `<div class="vrow" style="grid-template-columns:repeat(4,1fr);">
-      <div class="vcard" style="padding:16px 18px;"><div class="h-card">Gap After Base</div><div class="num" style="font-size:38px;line-height:1;margin-top:5px;color:var(--rep-lt);">${fmt(V.gap_after_base)}</div><div class="lede">votes beyond base GOTV</div></div>
-      <div class="vcard" style="padding:16px 18px;"><div class="h-card">Gap After Base + Lean</div><div class="num" style="font-size:38px;line-height:1;margin-top:5px;color:var(--gold-lt);">${fmt(V.gap_after_base_plus_lean)}</div><div class="lede">net votes to clear if lean support holds</div></div>
-      <div class="vcard" style="padding:16px 18px;"><div class="h-card">Persuasion Core</div><div class="num" style="font-size:38px;line-height:1;margin-top:5px;color:var(--npa-lt);">${fmt(V.persuasion_core)}</div><div class="lede">true swing + lean support + weak D</div></div>
-      <div class="vcard" style="padding:16px 18px;"><div class="h-card">Target Cushion</div><div class="num" style="font-size:38px;line-height:1;margin-top:5px;color:var(--teal-lt);">${fmt(V.target_overage)}</div><div class="lede">targets over win number</div></div>
+      <div class="vcard big-stat"><div class="h-card">Gap After Base</div><div class="num" style="line-height:1;margin-top:6px;color:var(--rep-lt);">${fmt(V.gap_after_base)}</div><div class="lede">votes beyond base GOTV</div></div>
+      <div class="vcard big-stat"><div class="h-card">Base + Lean Gap</div><div class="num" style="line-height:1;margin-top:6px;color:var(--gold-lt);">${fmt(V.gap_after_base_plus_lean)}</div><div class="lede">net votes still required</div></div>
+      <div class="vcard big-stat"><div class="h-card">Persuasion Core</div><div class="num" style="line-height:1;margin-top:6px;color:var(--npa-lt);">${fmt(V.persuasion_core)}</div><div class="lede">swing + crossover pool</div></div>
+      <div class="vcard big-stat"><div class="h-card">Target Cushion</div><div class="num" style="line-height:1;margin-top:6px;color:var(--teal-lt);">${fmt(V.target_overage)}</div><div class="lede">targets over win number</div></div>
     </div>
 
-    <div class="vrow" style="grid-template-columns:1.15fr 1fr;margin-top:14px;">
-      <div class="insight-strip">
-        <div><div class="h-card">Base Coverage</div><div class="num" style="font-size:34px;margin-top:6px;color:var(--teal-lt);">${pc1(V.base_share_of_win)}</div><div class="lede">GOTV share of win number</div></div>
-        <div><div class="h-card">Net Problem</div><div class="num" style="font-size:34px;margin-top:6px;color:var(--gold-lt);">${fmt(V.gap_after_base_plus_lean)}</div><div class="lede">After base + lean hold</div></div>
-        <div><div class="h-card">Main Battlefield</div><div class="num" style="font-size:34px;margin-top:6px;color:var(--npa-lt);">Colchester</div><div class="lede">${pc1(A.town_strategy[0].persuasion_share)} of persuasion core</div></div>
-      </div>
-      <div class="vcard" style="padding:18px 20px;">
-        <div class="h-card" style="margin-bottom:12px;">Program Mix</div>
-        <div style="display:flex;flex-direction:column;gap:10px;">${programRows}</div>
-      </div>
-    </div>
-
-    <div class="vrow" style="grid-template-columns:1.6fr 1fr;margin-top:14px;">
-      <div class="vcard" style="padding:18px 20px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
-          <span class="h-card">Strategic Map · ${metric.label}</span>
+    <div class="vrow" style="grid-template-columns:1.7fr .9fr;margin-top:18px;align-items:start;">
+      <div class="vcard map-shell">
+        <div class="map-head">
+          <div class="map-title"><span class="h-card">Strategic Map</span><span class="num" style="font-size:30px;color:var(--fg);">${metric.label}</span></div>
           <div class="seg">${metricBtns}</div>
         </div>
-        <div id="amap"></div><div class="legend" id="amap-legend" style="margin-top:10px;"></div>
+        <div id="amap"></div><div class="legend" id="amap-legend" style="margin-top:12px;"></div>
       </div>
-      <div class="vcard" style="padding:18px 20px;">
-        <div class="h-card" style="margin-bottom:12px;">Town Rank · ${metric.label}</div>
-        <div style="display:flex;flex-direction:column;gap:6px;">${mapTownRows}</div>
-        <div style="height:1px;background:var(--border);margin:16px 0;"></div>
-        <div class="lede">A geographic read of persuasion, protection, consumer texture, and Election Day load.</div>
+      <div class="vcard rank-panel" style="padding:20px 22px;">
+        <div class="h-card" style="margin-bottom:14px;">Town Rank</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">${mapTownRows}</div>
+        <div class="story-card" style="margin-top:16px;padding:18px;">
+          <div class="h-card" style="color:var(--gold-lt);">Main Battlefield</div>
+          <div class="num" style="font-size:34px;color:var(--npa-lt);">Colchester</div>
+          <p>${pc1(A.town_strategy[0].persuasion_share)} of the persuasion core sits here.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="vrow" style="grid-template-columns:1.15fr 1fr;margin-top:18px;">
+      <div class="story-card">
+        <div class="h-card" style="color:var(--teal-lt);">Read</div>
+        <div class="num" style="color:var(--fg);">${pc1(V.base_share_of_win)}</div>
+        <p>Base GOTV covers this share of the win number. The rest is a clean persuasion-and-lean-support problem.</p>
+      </div>
+      <div class="vcard" style="padding:20px 22px;">
+        <div class="h-card" style="margin-bottom:14px;">Program Mix</div>
+        <div class="mix-bars">${programRows}</div>
       </div>
     </div>
 
@@ -803,6 +807,7 @@ function analysisMap(id, metric) {
 }
 
 /* ───────────────── TARGETS ───────────────── */
+let targetMetric = "target_rate";
 ROUTES.targets = function (view) {
   if (!TARGET) {
     view.innerHTML = vhead("Target Universe", "var(--gold-lt)", "Targets Not Loaded", "Run build/import_targets.py") +
@@ -814,7 +819,7 @@ ROUTES.targets = function (view) {
   const entries = obj => Object.entries(obj || {}).sort((a, b) => b[1] - a[1]);
   const rowBar = (label, n, total, color) => {
     const w = total ? Math.max(2, 100 * n / total) : 0;
-    return `<div style="display:grid;grid-template-columns:minmax(160px,1fr) 74px 1.2fr;gap:12px;align-items:center;">
+    return `<div style="display:grid;grid-template-columns:minmax(180px,1fr) 86px 1.25fr;gap:14px;align-items:center;">
       <span class="tag" style="color:var(--fg);">${label}</span>
       <span class="num" style="text-align:right;color:${color};">${fmt(n)}</span>
       <span class="scorebar" style="margin:0;"><i style="width:${w}%;background:${color};"></i></span>
@@ -847,39 +852,73 @@ ROUTES.targets = function (view) {
   }).join("");
   const publicExports = (TARGET.exports || []).filter(x => !/\.csv$/i.test(x.href || ""));
   const exportLinks = publicExports.map(x => `<a class="chip" href="${x.href}" download>${x.label}</a>`).join("");
+  const targetMetrics = {
+    target_rate: { label: "Target rate", get: t => t.target_rate, fmt: pc1, color: [181, 167, 255] },
+    targets: { label: "Targets", get: t => t.targets, fmt: fmt, color: [101, 200, 207] },
+    persuasion: { label: "Persuasion", get: t => t.persuasion, fmt: fmt, color: [231, 199, 114] },
+    dem_crossover: { label: "Weak D crossover", get: t => t.dem_crossover, fmt: fmt, color: [96, 165, 250] },
+  };
+  if (!targetMetrics[targetMetric]) targetMetric = "target_rate";
+  const tm = targetMetrics[targetMetric];
+  const targetBtns = Object.entries(targetMetrics).map(([k, m]) => `<button class="seg-btn ${k === targetMetric ? "on" : ""}" data-target-metric="${k}">${m.label}</button>`).join("");
+  const townCards = TARGET.towns.slice().sort((a, b) => tm.get(b) - tm.get(a)).map(t =>
+    `<div class="prow" role="button" tabindex="0" data-target-town="${t.town}">
+      <span class="num" style="flex:1;">${t.town}</span>
+      <span class="num" style="color:var(--gold-lt);">${tm.fmt(tm.get(t))}</span>
+      <span class="kicker" style="width:82px;text-align:right;">${fmt(t.targets)} tgt</span>
+    </div>`).join("");
 
   view.innerHTML =
     vhead("2026 General", "var(--gold-lt)", "Targets", "Generated " + TARGET.generated_at.slice(0, 10)) +
     `<div class="vrow" style="grid-template-columns:repeat(4,1fr);">
-      <div class="vcard" style="padding:16px 18px;"><div class="h-card">Likely Pool</div><div class="num" style="font-size:38px;line-height:1;margin-top:5px;">${fmt(s.likely_voters)}</div><div class="lede">High + medium tiers</div></div>
-      <div class="vcard" style="padding:16px 18px;"><div class="h-card">Turnout Plan</div><div class="num" style="font-size:38px;line-height:1;margin-top:5px;color:var(--teal-lt);">${fmt(TARGET.planning_turnout)}</div><div class="lede">Working assumption</div></div>
-      <div class="vcard" style="padding:16px 18px;"><div class="h-card">Win Number</div><div class="num" style="font-size:38px;line-height:1;margin-top:5px;color:var(--gold-lt);">${fmt(TARGET.win_number)}</div><div class="lede">50% + 1</div></div>
-      <div class="vcard" style="padding:16px 18px;"><div class="h-card">Targets</div><div class="num" style="font-size:38px;line-height:1;margin-top:5px;color:var(--npa-lt);">${fmt(s.targets)}</div><div class="lede">${pc1(s.target_rate)} of likely pool</div></div>
+      <div class="vcard big-stat"><div class="h-card">Likely Pool</div><div class="num" style="line-height:1;margin-top:6px;">${fmt(s.likely_voters)}</div><div class="lede">high + medium tiers</div></div>
+      <div class="vcard big-stat"><div class="h-card">Turnout Plan</div><div class="num" style="line-height:1;margin-top:6px;color:var(--teal-lt);">${fmt(TARGET.planning_turnout)}</div><div class="lede">working assumption</div></div>
+      <div class="vcard big-stat"><div class="h-card">Win Number</div><div class="num" style="line-height:1;margin-top:6px;color:var(--gold-lt);">${fmt(TARGET.win_number)}</div><div class="lede">50% + 1</div></div>
+      <div class="vcard big-stat"><div class="h-card">Targets</div><div class="num" style="line-height:1;margin-top:6px;color:var(--npa-lt);">${fmt(s.targets)}</div><div class="lede">${pc1(s.target_rate)} of likely pool</div></div>
     </div>
 
-    <div class="vrow" style="grid-template-columns:1.1fr 1fr;margin-top:14px;">
-      <div class="vcard" style="padding:18px 20px;">
+    <div class="vrow" style="grid-template-columns:1.7fr .9fr;margin-top:18px;align-items:start;">
+      <div class="vcard map-shell">
+        <div class="map-head">
+          <div class="map-title"><span class="h-card">Target Map</span><span class="num" style="font-size:30px;color:var(--fg);">${tm.label}</span></div>
+          <div class="seg">${targetBtns}</div>
+        </div>
+        <div id="target-map"></div><div class="legend" id="target-map-legend" style="margin-top:12px;"></div>
+      </div>
+      <div class="vcard rank-panel" style="padding:20px 22px;">
+        <div class="h-card" style="margin-bottom:14px;">Town Rank</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">${townCards}</div>
+        <div class="story-card" style="margin-top:16px;padding:18px;">
+          <div class="h-card" style="color:var(--gold-lt);">Universe Shape</div>
+          <div class="num" style="font-size:34px;color:var(--npa-lt);">${fmt(s.targets)}</div>
+          <p>One fixed target universe, mapped by town so field and paid media can see where weight belongs.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="vrow" style="grid-template-columns:1.1fr 1fr;margin-top:18px;">
+      <div class="vcard" style="padding:20px 22px;">
         <div class="h-card" style="margin-bottom:12px;">Target Type Mix</div>
-        <div style="display:flex;flex-direction:column;gap:10px;">${typeRows}</div>
+        <div class="mix-bars">${typeRows}</div>
       </div>
-      <div class="vcard" style="padding:18px 20px;">
+      <div class="vcard" style="padding:20px 22px;">
         <div class="h-card" style="margin-bottom:12px;">Target Party Mix</div>
-        <div style="display:flex;flex-direction:column;gap:10px;">${partyRows}</div>
+        <div class="mix-bars">${partyRows}</div>
       </div>
     </div>
 
-    <div class="vrow" style="grid-template-columns:1fr 1fr;margin-top:14px;">
-      <div class="vcard" style="padding:18px 20px;">
+    <div class="vrow" style="grid-template-columns:1fr 1fr;margin-top:18px;">
+      <div class="story-card">
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;"><span class="h-card">Persuasion Core</span><span class="num" style="color:var(--gold-lt);">${fmt(s.persuasion_targets)}</span></div>
-        <div class="lede">Lean support + true swing after exclusions.</div>
+        <p>Lean support plus true swing after exclusions.</p>
         <div style="margin-top:12px;display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;">
           <div style="background:var(--navy-card);padding:12px 14px;"><div class="h-card">U/IT Not Targeted</div><div class="num" style="font-size:24px;color:var(--rep-lt);">${fmt(s.u_it_not_targeted)}</div></div>
           <div style="background:var(--navy-card);padding:12px 14px;"><div class="h-card">Not Targeted Overall</div><div class="num" style="font-size:24px;color:var(--fg-muted);">${fmt(s.not_targeted)}</div></div>
         </div>
       </div>
-      <div class="vcard" style="padding:18px 20px;">
+      <div class="vcard" style="padding:20px 22px;">
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;"><span class="h-card">Weak D Crossover</span><span class="num" style="color:var(--dem-lt);">${fmt(s.dem_crossover_targets)}</span></div>
-        <div style="display:flex;flex-direction:column;gap:10px;">${demRows}</div>
+        <div class="mix-bars">${demRows}</div>
       </div>
     </div>
 
@@ -911,7 +950,51 @@ ROUTES.targets = function (view) {
       <div style="display:flex;gap:9px;flex-wrap:wrap;">${exportLinks}</div>
     </div>
     <div class="vbanner"><span class="tag" style="font-size:10px;color:var(--gold);">Model</span><span class="kicker" style="text-transform:none;letter-spacing:0;font-family:var(--ff-body);font-size:10.5px;">Fixed universe for campaign planning; see public summaries for detail.</span></div>`;
+
+  view.querySelectorAll("[data-target-metric]").forEach(btn => btn.onclick = () => { targetMetric = btn.dataset.targetMetric; route(); });
+  view.querySelectorAll("[data-target-town]").forEach(row => {
+    const open = () => { const t = TOWNS[row.dataset.targetTown]; if (t) drillTown(t, "town"); };
+    row.onclick = open;
+    row.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } };
+  });
+  setTimeout(() => targetMap("target-map", tm, "target-map-legend"), 30);
 };
+
+function targetMap(id, metric, legendId) {
+  const host = document.getElementById(id);
+  if (!host || !GEO || !GEO.towns || !TARGET || !TARGET.towns) return;
+  const rows = TARGET.towns || [];
+  const byTown = Object.fromEntries(rows.map(t => [t.town, t]));
+  const vals = rows.map(metric.get);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const color = v => {
+    const lo = [24, 33, 43], base = metric.color || [101, 200, 207];
+    const t = max > min ? (v - min) / (max - min) : .5;
+    return `rgb(${lo.map((c, i) => Math.round(c + (base[i] - c) * (0.18 + 0.82 * t))).join(",")})`;
+  };
+  const map = L.map(id, { scrollWheelZoom: false, attributionControl: false });
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png", { maxZoom: 18 }).addTo(map);
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png", { maxZoom: 18, pane: "markerPane" }).addTo(map);
+  map.fitBounds(GEO.bounds, { padding: [18, 18] });
+  (window._maps = window._maps || []).push(map);
+  const layer = L.geoJSON(GEO.towns, {
+    style: f => {
+      const row = byTown[f.properties.town];
+      const v = row ? metric.get(row) : 0;
+      return { fillColor: row ? color(v) : "#0F1A2C", fillOpacity: .9, color: "#06111F", weight: 1.2 };
+    },
+    onEachFeature: (f, lyr) => {
+      const row = byTown[f.properties.town], town = TOWNS[f.properties.town];
+      if (!row || !town) return;
+      lyr.bindTooltip(`<b>${row.town}</b><br>${metric.label}: ${metric.fmt(metric.get(row))}<br>${fmt(row.targets)} targets<br>${fmt(row.persuasion)} persuasion`, { sticky: true });
+      lyr.on({ mouseover: e => e.target.setStyle({ weight: 3, color: "#22AABC" }), mouseout: e => layer.resetStyle(e.target), click: () => drillTown(town, "town") });
+    }
+  }).addTo(map);
+  const lg = legendId && document.getElementById(legendId);
+  if (lg) lg.innerHTML = `<span class="muted">${metric.label}</span>` +
+    `<span><i style="background:${color(min)}"></i>${metric.fmt(min)}</span>` +
+    `<span><i style="background:${color(max)}"></i>${metric.fmt(max)}</span>`;
+}
 
 /* ───────────────── BATTLEFIELD ───────────────── */
 let battleSel = 0;

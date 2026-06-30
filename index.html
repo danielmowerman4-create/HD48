@@ -393,7 +393,8 @@ tbody td{color:var(--fg);border-bottom-color:rgba(246,242,234,.06)}
 .seg{border-radius:6px;background:rgba(0,0,0,.18)}
 .seg-btn{font-size:12px;letter-spacing:1.2px;padding:9px 14px}
 .seg-btn.on{background:var(--camp);color:#FFF7EF}
-#gmap,#amap,#rmap,#tmap,#map,#bmap{border-radius:6px;border-color:rgba(246,242,234,.12)}
+#gmap,#amap,#rmap,#tmap,#map,#bmap,#target-map{border-radius:6px;border-color:rgba(246,242,234,.12)}
+#target-map{height:560px;border:1px solid var(--border);background:var(--navy-tile);z-index:1}
 .narr{background:linear-gradient(180deg,rgba(246,242,234,.04),rgba(246,242,234,.015));border-color:var(--border);border-left-color:var(--camp)}
 .narr h3{color:var(--gold-lt);letter-spacing:1.5px}
 .insight-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden}
@@ -401,6 +402,30 @@ tbody td{color:var(--fg);border-bottom-color:rgba(246,242,234,.06)}
 .visual-rule{display:flex;align-items:center;gap:12px;margin:22px 0 12px}
 .visual-rule span:first-child{font-size:12px;letter-spacing:2px;color:var(--gold-lt)}
 .visual-rule span:last-child{flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent)}
+.route-analysis,.route-targets{max-width:1440px}
+.route-analysis .h-page,.route-targets .h-page{font-size:50px}
+.route-analysis .h-card,.route-targets .h-card{font-size:11px;letter-spacing:1.9px}
+.route-analysis .lede,.route-targets .lede{font-size:13.5px;line-height:1.55;color:#B4BEC9}
+.route-analysis .tag,.route-targets .tag{font-size:12px}
+.big-stat{padding:22px 24px!important;min-height:142px}
+.big-stat .num{font-size:52px!important}
+.big-stat .lede{margin-top:8px;max-width:24ch}
+.story-card{background:linear-gradient(145deg,rgba(198,148,56,.1),rgba(101,200,207,.05)),var(--navy-card);border:1px solid rgba(231,199,114,.2);border-radius:8px;padding:22px 24px;box-shadow:var(--shadow-card)}
+.story-card .num{font-size:44px;line-height:1;margin-top:8px}
+.story-card p{margin:10px 0 0;color:#C0C8D1;font-size:14px;line-height:1.55}
+.map-shell{padding:20px 22px!important}
+.map-head{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.map-title{display:flex;flex-direction:column;gap:5px}
+.rank-panel .prow{padding:13px 12px}
+.rank-panel .num{font-size:18px!important}
+.rank-panel .kicker{font-size:10px}
+.mix-bars{display:flex;flex-direction:column;gap:13px}
+.mix-bars .tag{font-size:12px}
+.mix-bars .scorebar{height:9px}
+.route-analysis #amap{height:560px}
+.route-analysis tbody td,.route-targets tbody td{font-size:14px}
+.route-analysis td .nm,.route-analysis td.nm,.route-targets td .nm,.route-targets td.nm{font-size:17px}
+.route-analysis thead th,.route-targets thead th{font-size:11px}
 .leaflet-container{background:var(--navy-tile)!important}
 .leaflet-tooltip{background:rgba(6,17,31,.95)!important;border:1px solid rgba(255,255,255,.1)!important;color:var(--fg)!important;
   font-family:var(--ff-display)!important;font-weight:700!important;box-shadow:var(--shadow-tooltip)!important;border-radius:var(--r-md)!important;padding:8px 12px!important}
@@ -414,7 +439,9 @@ tbody td{color:var(--fg);border-bottom-color:rgba(246,242,234,.06)}
   .view{padding:18px 16px 56px}
   .vrow,.grid{grid-template-columns:1fr!important}
   .metric-grid,.insight-strip{grid-template-columns:1fr 1fr}
-  .h-page{font-size:34px}
+  .h-page,.route-analysis .h-page,.route-targets .h-page{font-size:34px}
+  .big-stat{min-height:0}
+  .route-analysis #amap,#target-map{height:430px}
 }
 @media(max-width:720px){
   .mock-badge{display:none}
@@ -480,6 +507,6 @@ tbody td{color:var(--fg);border-bottom-color:rgba(246,242,234,.06)}
 <script src="data/health.js?v=10"></script>
 <script src="data/geometry.js?v=10"></script>
 <script src="data/targets.js?v=14"></script>
-<script src="app.js?v=15"></script>
+<script src="app.js?v=16"></script>
 </body>
 </html>
