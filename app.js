@@ -745,12 +745,6 @@ ROUTES.analysis = function (view) {
     return `<tr class="click" data-atown="${t.town}" style="${sel ? "background:rgba(34,170,188,.08);" : ""}"><td class="nm">${t.town}</td><td style="color:${t.true_swing > 500 ? "var(--npa-lt)" : "var(--teal-lt)"};">${tj}</td><td class="num">${fmt(t.targets)}</td><td class="num" style="color:var(--gold-lt);">${pc1(t.target_share)}</td><td class="num">${fmt(t.persuasion)}</td><td class="num">${fmt(t.true_swing)}</td><td class="num">${fmt(t.base_gotv + t.lean_support)}</td><td class="num" style="color:var(--dem-lt);">${fmt(t.weak_dem)}</td></tr>`;
   }).join("");
 
-  const segmentRows = CON.segments.map(seg => {
-    const signals = top(seg.consumer_signals, 3).map(([k, v]) => `${k} (${fmt(v)})`).join(" · ") || "No dominant signal";
-    const methods = top(seg.vote_methods, 2).map(([k, v]) => `${k.replace("Likely ", "")} ${fmt(v)}`).join(" · ");
-    return `<tr><td class="nm">${seg.segment}</td><td class="num">${fmt(seg.count)}</td><td>${signals}</td><td>${methods}</td></tr>`;
-  }).join("");
-
   view.innerHTML =
     vhead("Fixed Universe", "var(--gold-lt)", "Analysis", "Aggregate SOTS + L2") +
     `<div class="wpanel cols-4" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px;">${kpis}</div>
@@ -799,22 +793,13 @@ ROUTES.analysis = function (view) {
 
     <div class="wpanel" style="grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;">
       <div class="vcard" style="padding:20px 22px;">
-        <div class="rlabel" style="margin-bottom:14px;">Consumer / L2 Texture</div>
-        <div style="display:flex;flex-direction:column;gap:11px;">${barRows(CON.expanded_l2_signals, V.targets, "var(--gold-lt)")}</div>
-        <div style="height:1px;background:var(--border);margin:16px 0;"></div>
-        <div class="rctx">${CON.reads[1]}</div>
+        <div class="rlabel" style="margin-bottom:14px;">Vote Method</div>
+        <div style="display:flex;flex-direction:column;gap:11px;">${barRows(CON.vote_methods, V.targets, "var(--teal-lt)")}</div>
       </div>
       <div class="vcard" style="padding:20px 22px;">
-        <div class="rlabel" style="margin-bottom:14px;">Vote Method + Age</div>
-        <div style="display:flex;flex-direction:column;gap:11px;">${barRows(CON.vote_methods, V.targets, "var(--teal-lt)")}</div>
-        <div style="height:1px;background:var(--border);margin:16px 0;"></div>
+        <div class="rlabel" style="margin-bottom:14px;">Age Bands</div>
         <div style="display:flex;flex-direction:column;gap:11px;">${barRows(CON.age_bands, V.targets, "var(--npa-lt)")}</div>
       </div>
-    </div>
-
-    <div class="vcard" style="padding:0;overflow:hidden;margin-top:16px;">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;padding:16px 20px 12px;"><span class="rlabel">Segment Read</span><span class="rlabel" style="color:var(--fg-dim);">aggregate L2 signals only</span></div>
-      <div class="tbl-wrap" style="border:0;border-radius:0;border-top:1px solid var(--border);"><table><thead><tr><th>Segment</th><th class="num">Count</th><th>Consumer signals</th><th>Method tendency</th></tr></thead><tbody>${segmentRows}</tbody></table></div>
     </div>
 
     <div class="vbanner"><span class="tag" style="font-size:10px;color:var(--gold);">Guardrail</span><span class="kicker" style="text-transform:none;letter-spacing:0;font-family:var(--ff-body);font-size:10.5px;">Aggregate signals only. No voter-level records are shown.</span></div>`;
