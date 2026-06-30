@@ -35,6 +35,7 @@ const precList = () => Object.values(PREC).filter(p => p.active > 5).sort((a, b)
 /* ---- nav ---- */
 const NAV = [
   ["verdict", "Verdict"],
+  ["analysis", "Analysis"],
   ["targets", "Targets"],
   ["geography", "Map"],
   ["results", "Results"],
@@ -42,9 +43,8 @@ const NAV = [
 function buildNav() {
   const n = $("#nav");
   NAV.forEach(([id, lab]) => {
-    const t = el("div", "tab"); t.dataset.route = id;
+    const t = el("a", "tab"); t.dataset.route = id; t.href = "#" + id;
     t.innerHTML = `<span class="tab-pip"></span>${lab}`;
-    t.onclick = () => location.hash = id;
     n.appendChild(t);
   });
 }
@@ -58,7 +58,11 @@ const ROUTE_ALIASES = {
 function route() {
   const raw = (location.hash.replace("#", "") || "verdict").split("/")[0];
   const r = ROUTE_ALIASES[raw] || raw;
-  document.querySelectorAll(".tab").forEach(a => a.classList.toggle("active", a.dataset.route === r));
+  document.querySelectorAll(".tab").forEach(a => {
+    const active = a.dataset.route === r;
+    a.classList.toggle("active", active);
+    active ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current");
+  });
   const meta = NAV.find(x => x[0] === r) || NAV[0];
   $("#t-title").textContent = meta[1];
   $("#view").innerHTML = "";
@@ -196,7 +200,9 @@ function rankTable(rows, kind) {
   const data = rows.map(get);
   return sortable(cols, data, (row) => {
     const tr = el("tr", "click");
+    tr.tabIndex = 0; tr.setAttribute("role", "button");
     tr.onclick = () => drillTown(row.raw, kind);
+    tr.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); drillTown(row.raw, kind); } };
     tr.innerHTML =
       `<td class="nm">${row.name}</td>` +
       `<td class="num">${fmt(row.active)}</td>` +
@@ -419,7 +425,7 @@ ROUTES.results = function (view) {
   view.appendChild(turnout);
 
   // map + town results
-  const row = el("div", "grid"); row.style.gridTemplateColumns = "1.5fr 1fr"; row.style.marginTop = "22px"; row.style.alignItems = "start";
+  const row = el("div", "vrow"); row.style.gridTemplateColumns = "1.5fr 1fr"; row.style.marginTop = "22px"; row.style.alignItems = "start";
   const mapCard = el("div", "card pad");
   mapCard.appendChild(el("p", "section-title", "Margin by town<span class='ln'></span>"));
   const md = el("div"); md.id = "rmap"; mapCard.appendChild(md);
@@ -636,6 +642,90 @@ ROUTES.verdict = function (view) {
     <div class="vbanner"><span class="tag" style="font-size:10px;color:var(--gold);">Note</span><span class="kicker" style="text-transform:none;letter-spacing:0;font-family:var(--ff-body);font-size:10.5px;">Registration, turnout & results are from the CT SOTS file and certified returns. The win number and target universes are projections for planning.</span></div>`;
 };
 
+/* ───────────────── ANALYSIS ───────────────── */
+ROUTES.analysis = function (view) {
+  if (!TARGET || !TARGET.analysis) {
+    view.innerHTML = vhead("Strategic Analysis", "var(--gold-lt)", "Analysis Not Loaded", "Run build/import_targets.py") +
+      `<div class="note info"><div>Aggregate analysis is not loaded yet.</div></div>`;
+    return;
+  }
+  const A = TARGET.analysis, V = A.vote_path, CON = A.consumer;
+  const top = (obj, n) => Object.entries(obj || {}).sort((a, b) => b[1] - a[1]).slice(0, n || 6);
+  const barRows = (obj, total, color) => top(obj, 8).map(([k, v]) => {
+    const w = total ? Math.max(2, 100 * v / total) : 0;
+    return `<div style="display:grid;grid-template-columns:minmax(130px,1fr) 58px 1.1fr;gap:10px;align-items:center;">
+      <span class="tag" style="color:var(--fg);">${k}</span><span class="num" style="text-align:right;color:${color};">${fmt(v)}</span>
+      <span class="scorebar" style="margin:0;"><i style="width:${w}%;background:${color};"></i></span></div>`;
+  }).join("");
+  const programRows = A.program_mix.map((r, i) => {
+    const colors = ["var(--teal-lt)", "var(--gold-lt)", "var(--npa-lt)", "var(--dem-lt)"];
+    return `<div style="display:grid;grid-template-columns:minmax(160px,1fr) 70px 54px 1.1fr;gap:12px;align-items:center;">
+      <span><span class="tag" style="color:var(--fg);">${r.label}</span><span class="kicker" style="display:block;font-size:9px;">${r.role}</span></span>
+      <span class="num" style="text-align:right;color:${colors[i]};">${fmt(r.count)}</span>
+      <span class="num" style="text-align:right;color:${colors[i]};">${pc1(r.share)}</span>
+      <span class="scorebar" style="margin:0;"><i style="width:${r.share}%;background:${colors[i]};"></i></span></div>`;
+  }).join("");
+  const townRows = A.town_strategy.map(t => {
+    const job = t.true_swing > 500 ? "Persuasion battlefield" : "Base / lean protection";
+    return `<tr><td class="nm">${t.town}</td><td>${job}</td><td class="num">${fmt(t.targets)}</td><td class="num">${pc1(t.target_share)}</td>
+      <td class="num">${fmt(t.persuasion)}</td><td class="num">${fmt(t.true_swing)}</td><td class="num">${fmt(t.base_gotv + t.lean_support)}</td><td class="num">${fmt(t.weak_dem)}</td></tr>`;
+  }).join("");
+  const segmentRows = CON.segments.map(seg => {
+    const signals = top(seg.consumer_signals, 3).map(([k, v]) => `${k} (${fmt(v)})`).join(" · ") || "No dominant signal";
+    const methods = top(seg.vote_methods, 2).map(([k, v]) => `${k.replace("Likely ", "")} ${fmt(v)}`).join(" · ");
+    return `<tr><td class="nm">${seg.segment}</td><td class="num">${fmt(seg.count)}</td><td>${signals}</td><td>${methods}</td></tr>`;
+  }).join("");
+
+  view.innerHTML =
+    vhead("Fixed Universe · Strategic Read", "var(--gold-lt)", "Analysis", "Aggregate SOTS + L2 model") +
+    `<div class="vrow" style="grid-template-columns:repeat(4,1fr);">
+      <div class="vcard" style="padding:16px 18px;"><div class="h-card">Gap After Base</div><div class="num" style="font-size:38px;line-height:1;margin-top:5px;color:var(--rep-lt);">${fmt(V.gap_after_base)}</div><div class="lede">votes beyond base GOTV</div></div>
+      <div class="vcard" style="padding:16px 18px;"><div class="h-card">Gap After Base + Lean</div><div class="num" style="font-size:38px;line-height:1;margin-top:5px;color:var(--gold-lt);">${fmt(V.gap_after_base_plus_lean)}</div><div class="lede">net votes to clear if lean support holds</div></div>
+      <div class="vcard" style="padding:16px 18px;"><div class="h-card">Persuasion Core</div><div class="num" style="font-size:38px;line-height:1;margin-top:5px;color:var(--npa-lt);">${fmt(V.persuasion_core)}</div><div class="lede">true swing + lean support + weak D</div></div>
+      <div class="vcard" style="padding:16px 18px;"><div class="h-card">Target Cushion</div><div class="num" style="font-size:38px;line-height:1;margin-top:5px;color:var(--teal-lt);">${fmt(V.target_overage)}</div><div class="lede">targets over win number</div></div>
+    </div>
+
+    <div class="vrow" style="grid-template-columns:1.15fr 1fr;margin-top:14px;">
+      <div class="narr" style="margin:0;">
+        <h3>Consultant Read</h3>
+        <p><b>The universe is sufficient, but not self-executing.</b> Base GOTV covers <b>${pc1(V.base_share_of_win)}</b> of the win number; the campaign still needs persuasion or lean-support conversion to finish the path.</p>
+        <p><b>The key number is ${fmt(V.gap_after_base_plus_lean)}.</b> If base and lean-support voters hold, that is the remaining net vote problem out of ${fmt(V.true_swing + V.weak_dem)} swing and crossover targets.</p>
+        <p><b>Colchester is the persuasion battlefield.</b> It holds ${pc1(A.town_strategy[0].persuasion_share)} of the persuasion core and almost all true-swing targets. The other towns are more about holding the line.</p>
+      </div>
+      <div class="vcard" style="padding:18px 20px;">
+        <div class="h-card" style="margin-bottom:12px;">Program Mix</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">${programRows}</div>
+      </div>
+    </div>
+
+    <div class="vcard" style="padding:18px 20px;margin-top:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;"><span class="h-card">Town Decisioning</span><span class="kicker" style="color:var(--gold-lt);">fixed universe · program job by geography</span></div>
+      <div class="tbl-wrap"><table><thead><tr><th>Town</th><th>Strategic job</th><th class="num">Targets</th><th class="num">Share</th><th class="num">Persuasion</th><th class="num">True Swing</th><th class="num">Base + Lean</th><th class="num">Weak D</th></tr></thead><tbody>${townRows}</tbody></table></div>
+    </div>
+
+    <div class="vrow" style="grid-template-columns:1fr 1fr;margin-top:14px;">
+      <div class="vcard" style="padding:18px 20px;">
+        <div class="h-card" style="margin-bottom:12px;">Consumer / L2 Texture</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">${barRows(CON.expanded_l2_signals, V.targets, "var(--gold-lt)")}</div>
+        <div style="height:1px;background:var(--border);margin:16px 0;"></div>
+        <div class="lede">${CON.reads[1]}</div>
+      </div>
+      <div class="vcard" style="padding:18px 20px;">
+        <div class="h-card" style="margin-bottom:12px;">Vote Method + Age</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">${barRows(CON.vote_methods, V.targets, "var(--teal-lt)")}</div>
+        <div style="height:1px;background:var(--border);margin:16px 0;"></div>
+        <div style="display:flex;flex-direction:column;gap:10px;">${barRows(CON.age_bands, V.targets, "var(--npa-lt)")}</div>
+      </div>
+    </div>
+
+    <div class="vcard" style="padding:18px 20px;margin-top:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;"><span class="h-card">Segment Read</span><span class="kicker" style="color:var(--fg-dim);">aggregate L2 signals only</span></div>
+      <div class="tbl-wrap"><table><thead><tr><th>Segment</th><th class="num">Count</th><th>Consumer signals</th><th>Method tendency</th></tr></thead><tbody>${segmentRows}</tbody></table></div>
+    </div>
+
+    <div class="vbanner"><span class="tag" style="font-size:10px;color:var(--gold);">Data Guardrail</span><span class="kicker" style="text-transform:none;letter-spacing:0;font-family:var(--ff-body);font-size:10.5px;">This page uses aggregate L2 and SOTS-derived signals. It does not expose voter-level names, addresses, phones or scores.</span></div>`;
+};
+
 /* ───────────────── TARGETS ───────────────── */
 ROUTES.targets = function (view) {
   if (!TARGET) {
@@ -679,7 +769,8 @@ ROUTES.targets = function (view) {
       <td><span style="${chipStyle(chipFor(p.opportunity.class))}">${chipFor(p.opportunity.class)}</span></td>
     </tr>`;
   }).join("");
-  const exportLinks = (TARGET.exports || []).map(x => `<a class="chip" href="${x.href}" download>${x.label}</a>`).join("");
+  const publicExports = (TARGET.exports || []).filter(x => !/\.csv$/i.test(x.href || ""));
+  const exportLinks = publicExports.map(x => `<a class="chip" href="${x.href}" download>${x.label}</a>`).join("");
 
   view.innerHTML =
     vhead("2026 General Election", "var(--gold-lt)", "Target Universe", "Generated " + TARGET.generated_at.replace("T", " · ").slice(0, 21)) +
@@ -740,7 +831,7 @@ ROUTES.targets = function (view) {
     </div>
 
     <div class="vcard" style="padding:18px 20px;margin-top:14px;">
-      <div class="h-card" style="margin-bottom:12px;">Exports</div>
+      <div class="h-card" style="margin-bottom:12px;">Public Summaries</div>
       <div style="display:flex;gap:9px;flex-wrap:wrap;">${exportLinks}</div>
     </div>
     <div class="vbanner"><span class="tag" style="font-size:10px;color:var(--gold);">Model Note</span><span class="kicker" style="text-transform:none;letter-spacing:0;font-family:var(--ff-body);font-size:10.5px;">${TARGET.notes.join(" ")}</span></div>`;
@@ -759,7 +850,7 @@ ROUTES.battlefield = function (view) {
     const type = chipFor(p.opportunity.class);
     const sel = i === battleSel, target = i < 5;
     const bg = sel ? "background:rgba(26,139,154,.14);border-color:rgba(26,139,154,.3);" : (target ? "background:rgba(212,160,23,.05);" : "");
-    return `<div class="prow" style="${bg}" data-i="${i}">
+    return `<div class="prow" style="${bg}" data-i="${i}" role="button" tabindex="0">
       <span class="num" style="font-size:12px;color:var(--fg-muted);width:20px;text-align:right;flex-shrink:0;">${String(i + 1).padStart(2, "0")}</span>
       <div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:8px;"><span class="num" style="font-size:14px;color:var(--fg);">${p.name}</span><span style="${chipStyle(type)}">${type}</span></div>
       <div style="display:flex;height:4px;border-radius:2px;overflow:hidden;margin-top:5px;background:#0F1A2C;"><div style="width:${dem}%;background:var(--dem);"></div><div style="width:${100 - dem}%;background:var(--rep);"></div></div></div>
@@ -819,7 +910,11 @@ ROUTES.battlefield = function (view) {
         <div style="height:8px;border-radius:4px;background:#0F1A2C;margin-top:10px;overflow:hidden;"><div style="height:100%;width:${Math.round(100 * T.newly_registered / T.active)}%;background:var(--gold);"></div></div></div>
     </div>`;
 
-  view.querySelectorAll("#prows .prow").forEach(el => el.onclick = () => { battleSel = +el.dataset.i; route(); });
+  view.querySelectorAll("#prows .prow").forEach(el => {
+    const select = () => { battleSel = +el.dataset.i; route(); };
+    el.onclick = select;
+    el.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(); } };
+  });
   setTimeout(() => resultsMap("bmap", HMAINrace, null), 30);
 };
 
@@ -888,7 +983,7 @@ ROUTES.geography = function (view) {
   const list = geoMode === "town"
     ? towns.map(t => ({ name: t.name, v: m.get(t), sub: fmt(t.active) + " act", col: m.color(m.get(t)), kind: "town", obj: t }))
     : precs.map(p => ({ name: p.name, v: m.get(p), sub: fmt(p.active) + " act", col: m.color(m.get(p)), kind: "precinct", obj: p }));
-  const listRows = list.map((r, i) => `<div class="prow" data-i="${i}"><span style="width:12px;height:12px;border-radius:3px;background:${r.col};flex-shrink:0;"></span>
+  const listRows = list.map((r, i) => `<div class="prow" data-i="${i}" role="button" tabindex="0"><span style="width:12px;height:12px;border-radius:3px;background:${r.col};flex-shrink:0;"></span>
     <span class="num" style="font-size:15px;flex:1;">${r.name}</span><span class="num" style="color:var(--gold-lt);">${m.fmt(r.v)}</span>
     <span class="kicker" style="width:56px;text-align:right;">${r.sub}</span></div>`).join("");
 
@@ -912,7 +1007,11 @@ ROUTES.geography = function (view) {
 
   view.querySelectorAll(".seg")[0].querySelectorAll("button").forEach(b => b.onclick = () => { geoMetric = b.dataset.k; route(); });
   view.querySelectorAll(".seg")[1].querySelectorAll("button").forEach(b => b.onclick = () => { geoMode = b.dataset.m; route(); });
-  view.querySelectorAll(".prow").forEach(el => el.onclick = () => { const r = list[+el.dataset.i]; drillTown(r.obj, r.kind); });
+  view.querySelectorAll(".prow").forEach(el => {
+    const open = () => { const r = list[+el.dataset.i]; drillTown(r.obj, r.kind); };
+    el.onclick = open;
+    el.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } };
+  });
   setTimeout(() => geoMap("gmap", m, geoMode, "gmap-legend"), 30);
 };
 function townCentroids() {
@@ -990,6 +1089,7 @@ function openDrawer(h, body) {
   $("#drawer").classList.add("open"); $("#scrim").classList.add("open");
 }
 window.closeDrawer = () => { $("#drawer").classList.remove("open"); $("#scrim").classList.remove("open"); };
+window.addEventListener("keydown", e => { if (e.key === "Escape") window.closeDrawer(); });
 
 /* ============================ small UI helpers ============================ */
 function pageHead(view, title, sub) {

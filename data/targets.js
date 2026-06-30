@@ -1,41 +1,290 @@
 window.TARGET_UNIVERSE = {
+  "analysis": {
+    "consumer": {
+      "age_bands": {
+        "18-34": 716,
+        "35-49": 1585,
+        "50-64": 2597,
+        "65-79": 2327,
+        "80+": 716,
+        "Unknown": 15
+      },
+      "commercial_signals": {
+        "CommercialDataLL_Home_Owner_Or_Renter=Likely Renter": 282,
+        "CommercialDataLL_Interest_in_Automotive_Parts_Accessories_In_Household=Yes": 634,
+        "CommercialDataLL_Interest_in_Boating_Sailing_In_Household=Yes": 509,
+        "CommercialDataLL_Interest_in_Fishing_In_Household=Yes": 384,
+        "CommercialDataLL_Interest_in_SpectatorSports_Auto_Racing_In_Household=Yes": 277,
+        "CommercialDataLL_Interest_in_Travel_International_In_Household=Yes": 214,
+        "CommercialData_DwellingType=Multi-Family Dwelling": 317,
+        "CommercialData_OccupationGroup=Blue Collar": 320,
+        "CommercialData_OccupationGroup=Management/Business and Financial Operations": 146,
+        "CommercialData_OccupationGroup=Retired": 150,
+        "CommercialData_PropertyType=Apartment": 194,
+        "Raw weak ensemble score": 1574
+      },
+      "context_signals": {
+        "business-owner flag": 62,
+        "gun-owner model": 719,
+        "veteran flag": 156
+      },
+      "expanded_l2_signals": {
+        "concealed-permit model": 254,
+        "fishing interest": 561,
+        "high political-contributor index": 25,
+        "hunting interest": 87,
+        "military status": 10,
+        "shooting interest": 1125
+      },
+      "household_party": {
+        "Democratic": 52,
+        "Democratic & Independent": 50,
+        "Democratic & Republican": 258,
+        "Democratic & Republican & Independent": 144,
+        "Independent": 1289,
+        "Republican": 943,
+        "Republican & Independent": 954
+      },
+      "issue_signals": {
+        "ACA tag oppose": 37,
+        "L2 party ID Republican": 8,
+        "arts/culture donor tag": 8,
+        "gay-marriage tag oppose": 53,
+        "gay-marriage tag support": 12,
+        "pro-choice tag": 22,
+        "pro-life tag": 28,
+        "social views conservative": 43,
+        "social views liberal": 14,
+        "tax-raise tag oppose": 12
+      },
+      "reads": [
+        "The target universe is older and highly habitual: 63% are 50+, and nearly all targets sit in Very High, High, or Medium turnout tiers.",
+        "The persuasion universe is not a generic middle: L2 texture points to outdoor, gun-owner, veteran, business-owner, and blue-collar/commercial-interest clusters.",
+        "Colchester carries the largest true-swing load; Lebanon, Bozrah, and Franklin are more base/lean-support protection environments.",
+        "Election Day and early vote are both large enough to need separate programs; do not let early-vote banking cannibalize Election Day base protection."
+      ],
+      "segments": [
+        {
+          "consumer_signals": {
+            "concealed-permit model": 168,
+            "fishing interest": 327,
+            "high political-contributor index": 13,
+            "hunting interest": 58,
+            "shooting interest": 637
+          },
+          "context_signals": {
+            "business-owner flag": 41,
+            "gun-owner model": 434,
+            "veteran flag": 104
+          },
+          "count": 3586,
+          "household_party": {
+            "Democratic & Republican": 173,
+            "Democratic & Republican & Independent": 68,
+            "Independent": 68,
+            "Republican": 936,
+            "Republican & Independent": 659
+          },
+          "segment": "Base GOTV",
+          "vote_methods": {
+            "Likely Absentee": 129,
+            "Likely Early Vote": 1506,
+            "Likely Election Day": 1738,
+            "Mixed Method": 213
+          }
+        },
+        {
+          "consumer_signals": {
+            "concealed-permit model": 60,
+            "fishing interest": 120,
+            "high political-contributor index": 6,
+            "hunting interest": 20,
+            "shooting interest": 260
+          },
+          "context_signals": {
+            "business-owner flag": 10,
+            "gun-owner model": 160,
+            "veteran flag": 26
+          },
+          "count": 1814,
+          "household_party": {
+            "Democratic & Independent": 5,
+            "Democratic & Republican": 3,
+            "Democratic & Republican & Independent": 26,
+            "Independent": 512,
+            "Republican & Independent": 282
+          },
+          "segment": "Lean Support Persuasion/GOTV",
+          "vote_methods": {
+            "Likely Absentee": 64,
+            "Likely Early Vote": 659,
+            "Likely Election Day": 908,
+            "Mixed Method": 183
+          }
+        },
+        {
+          "consumer_signals": {
+            "concealed-permit model": 8,
+            "fishing interest": 76,
+            "high political-contributor index": 5,
+            "hunting interest": 3,
+            "shooting interest": 134
+          },
+          "context_signals": {
+            "business-owner flag": 5,
+            "gun-owner model": 61,
+            "veteran flag": 17
+          },
+          "count": 2348,
+          "household_party": {
+            "Democratic": 4,
+            "Democratic & Independent": 6,
+            "Democratic & Republican & Independent": 17,
+            "Independent": 703,
+            "Republican & Independent": 3
+          },
+          "segment": "True Swing Persuasion",
+          "vote_methods": {
+            "Likely Absentee": 135,
+            "Likely Early Vote": 1131,
+            "Likely Election Day": 884,
+            "Mixed Method": 198
+          }
+        },
+        {
+          "consumer_signals": {
+            "concealed-permit model": 18,
+            "fishing interest": 38,
+            "high political-contributor index": 1,
+            "hunting interest": 6,
+            "shooting interest": 94
+          },
+          "context_signals": {
+            "business-owner flag": 6,
+            "gun-owner model": 64,
+            "veteran flag": 9
+          },
+          "count": 208,
+          "household_party": {
+            "Democratic": 41,
+            "Democratic & Independent": 34,
+            "Democratic & Republican": 79,
+            "Democratic & Republican & Independent": 33,
+            "Republican & Independent": 10
+          },
+          "segment": "Weak Democrat Persuasion",
+          "vote_methods": {
+            "Likely Absentee": 15,
+            "Likely Early Vote": 95,
+            "Likely Election Day": 86,
+            "Mixed Method": 12
+          }
+        }
+      ],
+      "vote_methods": {
+        "Likely Absentee": 343,
+        "Likely Early Vote": 3391,
+        "Likely Election Day": 3616,
+        "Mixed Method": 606
+      }
+    },
+    "program_mix": [
+      {
+        "count": 3586,
+        "label": "Base GOTV",
+        "role": "protect",
+        "share": 45.1
+      },
+      {
+        "count": 1814,
+        "label": "Lean Support Persuasion/GOTV",
+        "role": "secure",
+        "share": 22.8
+      },
+      {
+        "count": 2348,
+        "label": "True Swing Persuasion",
+        "role": "convert",
+        "share": 29.5
+      },
+      {
+        "count": 208,
+        "label": "Weak Democrat Persuasion",
+        "role": "cross-pressured",
+        "share": 2.6
+      }
+    ],
+    "town_strategy": [
+      {
+        "base_gotv": 2077,
+        "lean_support": 318,
+        "likely": 7525,
+        "persuasion": 2614,
+        "persuasion_share": 62.8,
+        "target_rate": 63.2,
+        "target_share": 59.8,
+        "targets": 4759,
+        "town": "Colchester",
+        "true_swing": 2296,
+        "weak_dem": 68
+      },
+      {
+        "base_gotv": 780,
+        "lean_support": 782,
+        "likely": 2297,
+        "persuasion": 798,
+        "persuasion_share": 19.2,
+        "target_rate": 71.4,
+        "target_share": 20.6,
+        "targets": 1639,
+        "town": "Lebanon",
+        "true_swing": 16,
+        "weak_dem": 61
+      },
+      {
+        "base_gotv": 388,
+        "lean_support": 391,
+        "likely": 1237,
+        "persuasion": 410,
+        "persuasion_share": 9.9,
+        "target_rate": 67.9,
+        "target_share": 10.6,
+        "targets": 840,
+        "town": "Bozrah",
+        "true_swing": 19,
+        "weak_dem": 42
+      },
+      {
+        "base_gotv": 341,
+        "lean_support": 323,
+        "likely": 971,
+        "persuasion": 340,
+        "persuasion_share": 8.2,
+        "target_rate": 73.9,
+        "target_share": 9.0,
+        "targets": 718,
+        "town": "Franklin",
+        "true_swing": 17,
+        "weak_dem": 37
+      }
+    ],
+    "vote_path": {
+      "base_gotv": 3586,
+      "base_plus_lean": 5400,
+      "base_share_of_win": 59.8,
+      "gap_after_base": 2415,
+      "gap_after_base_plus_lean": 601,
+      "likely_voters": 12030,
+      "persuasion_core": 4162,
+      "planning_turnout": 12000,
+      "target_overage": 1955,
+      "targets": 7956,
+      "true_swing": 2348,
+      "weak_dem": 208,
+      "win_number": 6001
+    }
+  },
   "exports": [
-    {
-      "filename": "hd48_2026_likely_voter_universe.csv",
-      "href": "exports/hd48_2026_likely_voter_universe.csv",
-      "key": "likely",
-      "label": "Likely voter universe"
-    },
-    {
-      "filename": "hd48_2026_likely_voter_targets.csv",
-      "href": "exports/hd48_2026_likely_voter_targets.csv",
-      "key": "targets",
-      "label": "One target universe"
-    },
-    {
-      "filename": "hd48_2026_likely_persuasion_targets.csv",
-      "href": "exports/hd48_2026_likely_persuasion_targets.csv",
-      "key": "persuasion",
-      "label": "Persuasion targets"
-    },
-    {
-      "filename": "hd48_2026_likely_democrat_crossover_targets.csv",
-      "href": "exports/hd48_2026_likely_democrat_crossover_targets.csv",
-      "key": "dem_crossover",
-      "label": "Democratic crossover targets"
-    },
-    {
-      "filename": "hd48_2026_likely_democrat_crossover_review_audit.csv",
-      "href": "exports/hd48_2026_likely_democrat_crossover_review_audit.csv",
-      "key": "dem_review",
-      "label": "Democratic review/listening audit"
-    },
-    {
-      "filename": "hd48_2026_likely_unaffiliated_not_targeted.csv",
-      "href": "exports/hd48_2026_likely_unaffiliated_not_targeted.csv",
-      "key": "u_it_not_targeted",
-      "label": "Unaffiliated/Independent not targeted"
-    },
     {
       "filename": "hd48_2026_likely_voter_target_summary.md",
       "href": "exports/hd48_2026_likely_voter_target_summary.md",
@@ -47,12 +296,6 @@ window.TARGET_UNIVERSE = {
       "href": "exports/hd48_2026_likely_democrat_crossover_targets_summary.md",
       "key": "dem_summary",
       "label": "Democratic crossover summary"
-    },
-    {
-      "filename": "hd48_l2_sos_reconciliation.csv",
-      "href": "exports/hd48_l2_sos_reconciliation.csv",
-      "key": "l2_reconciliation",
-      "label": "L2/SOTS reconciliation audit"
     },
     {
       "filename": "hd48_l2_sos_reconciliation_summary.md",
@@ -67,11 +310,11 @@ window.TARGET_UNIVERSE = {
       "label": "L2/SOTS match ceiling"
     }
   ],
-  "generated_at": "2026-06-27T21:26:06",
+  "generated_at": "2026-06-30T08:33:09",
   "model": "HD48 2026 general-election likely-voter and target universe",
   "notes": [
     "Likely voters are turnout tiers Very High, High, and Medium.",
-    "The dashboard loads aggregate modeled counts only; voter-level rows are available as local export files.",
+    "The public dashboard loads aggregate modeled counts only; voter-level exports are intentionally not linked.",
     "One target universe includes base GOTV, lean-support persuasion/GOTV, true swing persuasion, and weak Democrat persuasion."
   ],
   "party_labels": {

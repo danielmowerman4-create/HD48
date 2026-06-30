@@ -98,6 +98,8 @@ a{color:inherit;text-decoration:none}
   white-space:nowrap;transition:color var(--d-base),border-color var(--d-base),background var(--d-base);position:relative}
 .tab:hover{color:var(--fg);background:linear-gradient(180deg,transparent,rgba(34,170,188,.06))}
 .tab.active{color:var(--teal-lt);border-bottom-color:var(--gold)}
+.tab:focus-visible,.btn:focus-visible,.seg-btn:focus-visible,.drawer .x:focus-visible,.prow:focus-visible,tbody tr.click:focus-visible{
+  outline:2px solid var(--teal-lt);outline-offset:2px}
 .tab-pip{width:5px;height:5px;border-radius:50%;background:currentColor;opacity:0;transform:scale(.4);
   transition:opacity var(--d-base),transform var(--d-base)}
 .tab.active .tab-pip{opacity:1;transform:scale(1)}
@@ -269,7 +271,8 @@ label.fld{display:flex;flex-direction:column;gap:6px;font-family:var(--ff-displa
 .drawer .db{padding:20px 24px;overflow:auto}
 .drawer .db .section-title{margin-top:20px}
 .drawer .db .section-title:first-child{margin-top:0}
-.drawer .x{cursor:pointer;color:var(--fg-muted);font-size:24px;line-height:1;transition:color var(--d-fast)}
+.drawer .x{cursor:pointer;color:var(--fg-muted);font-size:24px;line-height:1;transition:color var(--d-fast);
+  background:none;border:0;padding:0;font-family:inherit}
 .drawer .x:hover{color:var(--fg)}
 .scrim{position:fixed;inset:0;background:rgba(2,8,16,.6);backdrop-filter:blur(2px);z-index:190;opacity:0;pointer-events:none;transition:opacity .2s}
 .scrim.open{opacity:1;pointer-events:auto}
@@ -353,6 +356,7 @@ canvas{max-width:100%}
 .lede{font-family:var(--ff-body);font-size:12.5px;line-height:1.5;color:var(--fg-dim)}
 .tag{font-family:var(--ff-cond);font-weight:600;font-size:11px;letter-spacing:.8px;text-transform:uppercase}
 .vcard{background:var(--navy-card);border:1px solid var(--border);border-radius:8px}
+.vrow>*,.grid>*,.vcard,.card,.tbl-wrap{min-width:0}
 .vhead{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
 .vrow{display:grid;gap:14px}
 .metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);
@@ -375,8 +379,24 @@ canvas{max-width:100%}
   .kpis{grid-template-columns:repeat(2,1fr)}
   .header{padding:0 16px;gap:10px}.brand{font-size:18px;letter-spacing:2px}.h-title,.h-div{display:none}
   .view{padding:18px 16px 56px}
-  .vrow{grid-template-columns:1fr!important}
+  .vrow,.grid{grid-template-columns:1fr!important}
   .metric-grid{grid-template-columns:1fr 1fr}
+}
+@media(max-width:720px){
+  .mock-badge{display:none}
+  .tabs{padding:0 10px}
+  .tab{padding:0 14px;font-size:14px;letter-spacing:1.7px}
+  .subbar{padding:13px 16px;gap:10px;flex-wrap:wrap}
+  .subbar .right{display:none}
+  .sb-title{font-size:20px}
+}
+@media(max-width:520px){
+  .live-row{display:none}
+  .header{justify-content:center}
+  .tabs{justify-content:space-between;overflow-x:visible}
+  .tab{padding:0 8px;font-size:13px;letter-spacing:1.4px}
+  .tab-pip{display:none}
+  .sb-sub{max-width:150px}
 }
 </style>
 </head>
@@ -413,7 +433,7 @@ canvas{max-width:100%}
 </div>
 <div class="scrim" id="scrim" onclick="closeDrawer()"></div>
 <div class="drawer" id="drawer">
-  <div class="dh"><div id="dr-h"></div><div class="x" onclick="closeDrawer()">×</div></div>
+  <div class="dh"><div id="dr-h"></div><button type="button" class="x" onclick="closeDrawer()" aria-label="Close detail drawer">×</button></div>
   <div class="db" id="dr-b"></div>
 </div>
 
@@ -425,7 +445,7 @@ canvas{max-width:100%}
 <script src="data/precincts.js?v=10"></script>
 <script src="data/health.js?v=10"></script>
 <script src="data/geometry.js?v=10"></script>
-<script src="data/targets.js?v=11"></script>
-<script src="app.js?v=12"></script>
+<script src="data/targets.js?v=13"></script>
+<script src="app.js?v=14"></script>
 </body>
 </html>

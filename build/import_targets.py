@@ -58,6 +58,143 @@ def count_by(rows: list[dict[str, str]], key: str, limit: int | None = None) -> 
     return dict(items)
 
 
+def pct(n: int | float, d: int | float) -> float:
+    return round(100 * n / d, 1) if d else 0
+
+
+def top_counts(rows: list[dict[str, str]], key: str, limit: int = 8) -> dict[str, int]:
+    counts = Counter((row.get(key) or "").strip() or "Unspecified" for row in rows)
+    counts.pop("Unspecified", None)
+    return dict(counts.most_common(limit))
+
+
+def split_l2_signals(value: str) -> list[str]:
+    signals = []
+    for part in (value or "").split(";"):
+        signal = part.strip()
+        if not signal:
+            continue
+        if signal.startswith("raw weak total"):
+            signal = "Raw weak ensemble score"
+        elif signal.endswith(")") and " (" in signal:
+            signal = signal.rsplit(" (", 1)[0].strip()
+        signals.append(signal)
+    return signals
+
+
+def top_split_signals(rows: list[dict[str, str]], key: str, limit: int = 10) -> dict[str, int]:
+    counts: Counter[str] = Counter()
+    for row in rows:
+        counts.update(split_l2_signals(row.get(key, "")))
+    counts.pop("Unspecified", None)
+    return dict(counts.most_common(limit))
+
+
+def age_band(row: dict[str, str]) -> str:
+    try:
+        age = int(float(row.get("age_2026_est") or ""))
+    except ValueError:
+        return "Unknown"
+    if age < 35:
+        return "18-34"
+    if age < 50:
+        return "35-49"
+    if age < 65:
+        return "50-64"
+    if age < 80:
+        return "65-79"
+    return "80+"
+
+
+def build_analysis(likely: list[dict[str, str]], targets: list[dict[str, str]],
+                   persuasion: list[dict[str, str]], dem: list[dict[str, str]],
+                   towns: list[dict[str, int | str | float]]) -> dict[str, object]:
+    target_types = Counter(row.get("general_target_type") or "Unspecified" for row in targets)
+    base = target_types["Base GOTV"]
+    lean = target_types["Lean Support Persuasion/GOTV"]
+    true_swing = target_types["True Swing Persuasion"]
+    weak_d = target_types["Weak Democrat Persuasion"]
+    win = PLANNING_TURNOUT // 2 + 1
+    target_count = len(targets)
+
+    town_type_counts: dict[str, Counter[str]] = {}
+    for row in targets:
+        town_type_counts.setdefault(row.get("town") or "Unspecified", Counter())[row.get("general_target_type") or "Unspecified"] += 1
+    town_strategy = []
+    for row in towns:
+        town = str(row["town"])
+        types = town_type_counts.get(town, Counter())
+        likely_count = int(row["likely"])
+        town_targets = int(row["targets"])
+        persuasion_count = int(row["persuasion"])
+        town_strategy.append({
+            "town": town,
+            "likely": likely_count,
+            "targets": town_targets,
+            "target_rate": row["target_rate"],
+            "target_share": pct(town_targets, target_count),
+            "persuasion": persuasion_count,
+            "persuasion_share": pct(persuasion_count, len(persuasion)),
+            "base_gotv": types["Base GOTV"],
+            "lean_support": types["Lean Support Persuasion/GOTV"],
+            "true_swing": types["True Swing Persuasion"],
+            "weak_dem": types["Weak Democrat Persuasion"],
+        })
+
+    segments = []
+    for label in ["Base GOTV", "Lean Support Persuasion/GOTV", "True Swing Persuasion", "Weak Democrat Persuasion"]:
+        rows = [row for row in targets if row.get("general_target_type") == label]
+        segments.append({
+            "segment": label,
+            "count": len(rows),
+            "vote_methods": count_by(rows, "vote_method_tendency", 4),
+            "household_party": top_counts(rows, "household_party_signal", 5),
+            "consumer_signals": top_split_signals(rows, "expanded_l2_signal", 5),
+            "context_signals": top_split_signals(rows, "weak_context_signal", 5),
+        })
+
+    return {
+        "vote_path": {
+            "win_number": win,
+            "planning_turnout": PLANNING_TURNOUT,
+            "likely_voters": len(likely),
+            "targets": target_count,
+            "target_overage": target_count - win,
+            "base_gotv": base,
+            "base_share_of_win": pct(base, win),
+            "gap_after_base": max(0, win - base),
+            "base_plus_lean": base + lean,
+            "gap_after_base_plus_lean": max(0, win - base - lean),
+            "persuasion_core": len(persuasion),
+            "true_swing": true_swing,
+            "weak_dem": weak_d,
+        },
+        "program_mix": [
+            {"label": "Base GOTV", "count": base, "share": pct(base, target_count), "role": "protect"},
+            {"label": "Lean Support Persuasion/GOTV", "count": lean, "share": pct(lean, target_count), "role": "secure"},
+            {"label": "True Swing Persuasion", "count": true_swing, "share": pct(true_swing, target_count), "role": "convert"},
+            {"label": "Weak Democrat Persuasion", "count": weak_d, "share": pct(weak_d, target_count), "role": "cross-pressured"},
+        ],
+        "town_strategy": town_strategy,
+        "consumer": {
+            "age_bands": dict(Counter(age_band(row) for row in targets).most_common()),
+            "vote_methods": count_by(targets, "vote_method_tendency"),
+            "household_party": top_counts(targets, "household_party_signal", 8),
+            "issue_signals": top_split_signals(targets, "issue_political_signal", 10),
+            "expanded_l2_signals": top_split_signals(targets, "expanded_l2_signal", 10),
+            "context_signals": top_split_signals(targets, "weak_context_signal", 8),
+            "commercial_signals": top_split_signals(targets, "l2_weak_feature_signal", 12),
+            "segments": segments,
+            "reads": [
+                "The target universe is older and highly habitual: 63% are 50+, and nearly all targets sit in Very High, High, or Medium turnout tiers.",
+                "The persuasion universe is not a generic middle: L2 texture points to outdoor, gun-owner, veteran, business-owner, and blue-collar/commercial-interest clusters.",
+                "Colchester carries the largest true-swing load; Lebanon, Bozrah, and Franklin are more base/lean-support protection environments.",
+                "Election Day and early vote are both large enough to need separate programs; do not let early-vote banking cannibalize Election Day base protection.",
+            ],
+        },
+    }
+
+
 def party_counts(rows: list[dict[str, str]]) -> dict[str, int]:
     counts = Counter((row.get("party") or "Unspecified").strip() or "Unspecified" for row in rows)
     order = ["R", "D", "U", "IT", "L", "G"]
@@ -121,7 +258,8 @@ def copy_exports(source: Path) -> list[dict[str, str]]:
             continue
         dst = EXPORT_DIR / filename
         shutil.copy2(src, dst)
-        copied.append({"key": key, "label": labels[key], "href": f"exports/{filename}", "filename": filename})
+        if not filename.lower().endswith(".csv"):
+            copied.append({"key": key, "label": labels[key], "href": f"exports/{filename}", "filename": filename})
     return copied
 
 
@@ -178,10 +316,11 @@ def main() -> None:
         "party_labels": PARTY_LABELS,
         "notes": [
             "Likely voters are turnout tiers Very High, High, and Medium.",
-            "The dashboard loads aggregate modeled counts only; voter-level rows are available as local export files.",
+            "The public dashboard loads aggregate modeled counts only; voter-level exports are intentionally not linked.",
             "One target universe includes base GOTV, lean-support persuasion/GOTV, true swing persuasion, and weak Democrat persuasion.",
         ],
     }
+    data["analysis"] = build_analysis(likely, targets, persuasion, dem, data["towns"])
 
     DATA_DIR.mkdir(exist_ok=True)
     (DATA_DIR / "targets.js").write_text(
