@@ -550,7 +550,6 @@ function renderRail(active) {
   const rail = document.getElementById("rail");
   if (!rail) return;
   const s = standings();
-  const last = (C.candidate || "").split(" ").pop();
   const ctx = RAIL_CTX[active] || RAIL_CTX.verdict;
   const segs = [["var(--teal)", s.pBase], ["var(--gold)", s.pPersu], ["var(--npa)", s.pReg]]
     .map(([c, w]) => `<span style="flex:${Math.max(3, w)};background:${c};"></span>`).join("");
@@ -567,10 +566,7 @@ function renderRail(active) {
       <div class="r-num" style="font-size:42px;line-height:1;color:var(--gold-lt);margin-top:4px;">${fmt(s.win)}</div>
       <div class="rlabel" style="color:var(--fg-dim);margin-top:4px;">50% + 1 of ${fmt(s.winBase)}</div>
       <div class="gauge"><div class="fill" style="width:${s.fill.toFixed(1)}%;"></div><div class="mark" style="left:50%;"></div></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px;">
-        <div><div class="rlabel">${last} ’${String(myYear).slice(2)}</div><div class="r-num" style="font-size:24px;margin-top:3px;">${fmt(s.myV)}</div></div>
-        <div><div class="rlabel">Cleared</div><div class="r-num" style="font-size:24px;margin-top:3px;color:${s.cleared >= 0 ? "var(--teal-lt)" : "var(--rep-lt)"};">${s.cleared >= 0 ? "+" : "−"}${fmt(Math.abs(s.cleared))}</div></div>
-      </div>
+      <div style="margin-top:16px;"><div class="rlabel">Cleared · vs win number</div><div class="r-num" style="font-size:26px;margin-top:3px;color:${s.cleared >= 0 ? "var(--teal-lt)" : "var(--rep-lt)"};">${s.cleared >= 0 ? "+" : "−"}${fmt(Math.abs(s.cleared))}</div></div>
       ${RTS ? `<div class="rdiv" style="margin:16px 0 0;"></div>
       <div class="rlabel" style="margin-top:14px;">Universe</div>
       <div class="r-num" style="font-size:24px;margin-top:3px;">${fmt(RTS.targets)} <span style="font-size:13px;color:var(--fg-muted);font-weight:400;">of ${fmt(RTS.likely_voters)}</span></div>
@@ -643,7 +639,7 @@ ROUTES.verdict = function (view) {
         ${miniStat("Active Reg.", fmt(T.active), "var(--fg)")}
         ${miniStat(myYear + " Turnout", fmt(HMAIN.two), "var(--teal-lt)")}
         ${miniStat("Win Number", fmt(win), "var(--gold-lt)")}
-        ${miniStat(myLast + " ’" + String(myYear).slice(2), fmt(myV), "var(--fg)")}
+        ${miniStat("Cleared vs Win", (myV - win >= 0 ? "+" : "−") + fmt(Math.abs(myV - win)), myV - win >= 0 ? "var(--teal-lt)" : "var(--rep-lt)")}
       </div>
     </div>
 
@@ -660,6 +656,16 @@ ROUTES.verdict = function (view) {
 
 /* ───────────────── ANALYSIS ───────────────── */
 let analysisMetric = "persuasion_share";
+let analysisTown = null;
+const METRIC_SHORT = { persuasion_share: "Persuasion load", true_swing_rate: "True swing", base_lean_rate: "Base + lean", outdoor_l2_rate: "Outdoor / gun L2", election_day_rate: "Election Day" };
+const METRIC_STYLE = {
+  persuasion_share:  { rgb: [124, 58, 237],  hex: "#A78BFA", legend: "Share of persuasion core" },
+  true_swing_rate:   { rgb: [167, 139, 250], hex: "#C4B5FD", legend: "Convertible swing rate" },
+  base_lean_rate:    { rgb: [26, 139, 154],  hex: "#22AABC", legend: "Base & lean to protect" },
+  outdoor_l2_rate:   { rgb: [212, 160, 23],  hex: "#F0B82A", legend: "Outdoor / gun L2 cluster" },
+  election_day_rate: { rgb: [34, 170, 188],  hex: "#22AABC", legend: "Election Day load" },
+};
+function selectAnalysisTown(name) { analysisTown = name; route(); }
 ROUTES.analysis = function (view) {
   if (!TARGET || !TARGET.analysis) {
     view.innerHTML = vhead("Strategic Analysis", "var(--gold-lt)", "Analysis Not Loaded", "Run build/import_targets.py") +
@@ -669,157 +675,194 @@ ROUTES.analysis = function (view) {
   const A = TARGET.analysis, V = A.vote_path, CON = A.consumer;
   const mapMetrics = (A.map && A.map.metrics) || [];
   if (!mapMetrics.some(m => m.key === analysisMetric)) analysisMetric = mapMetrics[0] ? mapMetrics[0].key : "persuasion_share";
-  const metric = mapMetrics.find(m => m.key === analysisMetric) || { key: analysisMetric, label: "Analysis metric", suffix: "" };
+  const metric = mapMetrics.find(m => m.key === analysisMetric) || { key: analysisMetric, label: "Analysis metric", suffix: "%" };
+  const ms = METRIC_STYLE[metric.key] || METRIC_STYLE.base_lean_rate;
+  const rows = (A.map && A.map.towns) || [];
+  const byTown = Object.fromEntries(rows.map(t => [t.town, t]));
+  if (!byTown[analysisTown]) analysisTown = rows[0] ? rows[0].town : null;
+  const sd = byTown[analysisTown] || {};
   const top = (obj, n) => Object.entries(obj || {}).sort((a, b) => b[1] - a[1]).slice(0, n || 6);
-  const barRows = (obj, total, color) => top(obj, 8).map(([k, v]) => {
+  const barRows = (obj, total, color) => top(obj, 6).map(([k, v]) => {
     const w = total ? Math.max(2, 100 * v / total) : 0;
-    return `<div style="display:grid;grid-template-columns:minmax(160px,1fr) 72px 1.2fr;gap:12px;align-items:center;">
-      <span class="tag" style="color:var(--fg);">${k}</span><span class="num" style="text-align:right;color:${color};">${fmt(v)}</span>
+    return `<div style="display:grid;grid-template-columns:minmax(150px,1fr) 64px 1.2fr;gap:12px;align-items:center;">
+      <span class="tag" style="color:var(--fg);">${k}</span><span class="r-num" style="text-align:right;font-size:14px;color:${color};">${fmt(v)}</span>
       <span class="scorebar" style="margin:0;"><i style="width:${w}%;background:${color};"></i></span></div>`;
   }).join("");
-  const programRows = A.program_mix.map((r, i) => {
-    const colors = ["var(--teal-lt)", "var(--gold-lt)", "var(--npa-lt)", "var(--dem-lt)"];
-    return `<div style="display:grid;grid-template-columns:minmax(0,1fr) 62px 48px;gap:8px;align-items:center;">
-      <span><span class="tag" style="color:var(--fg);">${r.label}</span><span class="kicker" style="display:block;font-size:9px;">${r.role}</span></span>
-      <span class="num" style="text-align:right;color:${colors[i]};">${fmt(r.count)}</span>
-      <span class="num" style="text-align:right;color:${colors[i]};">${pc1(r.share)}</span>
-      <span class="scorebar" style="grid-column:1/-1;margin:0;"><i style="width:${r.share}%;background:${colors[i]};"></i></span></div>`;
+
+  // KPI atoms (stat-tile, accent top border)
+  const kpis = [
+    ["Gap After Base", fmt(V.gap_after_base), "var(--rep-lt)", "votes beyond base GOTV"],
+    ["Base + Lean Gap", fmt(V.gap_after_base_plus_lean), "var(--gold-lt)", "net votes still required"],
+    ["Persuasion Core", fmt(V.persuasion_core), "var(--npa-lt)", "swing + crossover pool"],
+    ["Target Cushion", fmt(V.target_overage), "var(--teal-lt)", "targets over win number"],
+  ].map(([l, v, c, n]) => `<div class="stat" style="--accent:${c};"><div class="sl">${l}</div><div class="sv">${v}</div><div class="ss">${n}</div></div>`).join("");
+
+  const metricBtns = mapMetrics.map(m => `<button class="seg-btn ${m.key === analysisMetric ? "on" : ""}" data-analysis-metric="${m.key}">${METRIC_SHORT[m.key] || m.label}</button>`).join("");
+
+  // selected-town detail panel (folds L2 texture into the console)
+  const job = (sd.true_swing || 0) > 500 ? "Persuasion battlefield" : "Base / lean protection";
+  const jobAccent = (sd.true_swing || 0) > 500 ? "var(--npa-lt)" : "var(--teal-lt)";
+  const detailRows = [
+    ["Targets", fmt(sd.targets), "var(--fg)"],
+    ["Persuasion", pc1(sd.persuasion_share), "var(--npa-lt)"],
+    ["True swing", fmt(sd.true_swing), "var(--npa-lt)"],
+    ["Base + lean", fmt(sd.base_lean), "var(--teal-lt)"],
+    ["Outdoor / gun", pc1(sd.outdoor_l2_rate), "var(--gold-lt)"],
+    ["Election Day", pc1(sd.election_day_rate), "var(--teal-lt)"],
+    ["Age 50+", pc1(sd.age_50_plus_rate), "var(--fg)"],
+    ["Veteran L2", fmt(sd.veteran_l2), "var(--fg)"],
+  ].map(([k, v, c]) => `<div class="dpanel-row"><span class="k">${k}</span><span class="r-num" style="font-size:15px;color:${c};">${v}</span></div>`).join("");
+
+  // town rank by current metric
+  const ranked = rows.slice().sort((a, b) => (b[metric.key] || 0) - (a[metric.key] || 0));
+  const rmax = Math.max(...ranked.map(t => t[metric.key] || 0)) || 1;
+  const rankRows = ranked.map((t, i) => {
+    const sel = t.town === analysisTown, v = t[metric.key] || 0;
+    return `<div class="prow" data-atown="${t.town}" role="button" tabindex="0" style="${sel ? "background:rgba(34,170,188,.12);border-color:rgba(34,170,188,.35);" : ""}">
+      <span class="r-num" style="font-size:12px;color:var(--fg-muted);width:18px;">${String(i + 1).padStart(2, "0")}</span>
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;"><span class="r-num" style="font-size:15px;color:var(--fg);">${t.town}</span><span class="r-num" style="font-size:14px;color:${ms.hex};">${pc1(v)}</span></div>
+        <div style="height:5px;border-radius:3px;background:rgba(255,255,255,.06);overflow:hidden;"><div style="height:100%;width:${100 * v / rmax}%;background:${ms.hex};border-radius:3px;"></div></div>
+      </div></div>`;
   }).join("");
+
+  // program mix
+  const pmColors = ["var(--teal-lt)", "var(--gold-lt)", "var(--npa-lt)", "var(--dem-lt)"];
+  const pmNames = ["Base GOTV", "Lean Support", "True Swing", "Weak Democrat"];
+  const programRows = A.program_mix.map((r, i) => `
+    <div style="margin-bottom:15px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
+        <span><span class="tag" style="color:var(--fg);">${pmNames[i] || r.label}</span> <span class="rlabel" style="font-size:8px;">${r.role}</span></span>
+        <span><span class="r-num" style="font-size:13px;color:var(--fg);">${fmt(r.count)}</span> <span class="r-num" style="font-size:13px;color:${pmColors[i]};">${pc1(r.share)}</span></span>
+      </div>
+      <div style="height:7px;border-radius:4px;background:rgba(255,255,255,.06);overflow:hidden;"><div style="height:100%;width:${r.share}%;background:${pmColors[i]};border-radius:4px;"></div></div>
+    </div>`).join("");
+
+  // town decisioning table (rows select the town)
   const townRows = A.town_strategy.map(t => {
-    const job = t.true_swing > 500 ? "Persuasion battlefield" : "Base / lean protection";
-    return `<tr><td class="nm">${t.town}</td><td>${job}</td><td class="num">${fmt(t.targets)}</td><td class="num">${pc1(t.target_share)}</td>
-      <td class="num">${fmt(t.persuasion)}</td><td class="num">${fmt(t.true_swing)}</td><td class="num">${fmt(t.base_gotv + t.lean_support)}</td><td class="num">${fmt(t.weak_dem)}</td></tr>`;
+    const tj = t.true_swing > 500 ? "Persuasion battlefield" : "Base / lean protection";
+    const sel = t.town === analysisTown;
+    return `<tr class="click" data-atown="${t.town}" style="${sel ? "background:rgba(34,170,188,.08);" : ""}"><td class="nm">${t.town}</td><td style="color:${t.true_swing > 500 ? "var(--npa-lt)" : "var(--teal-lt)"};">${tj}</td><td class="num">${fmt(t.targets)}</td><td class="num" style="color:var(--gold-lt);">${pc1(t.target_share)}</td><td class="num">${fmt(t.persuasion)}</td><td class="num">${fmt(t.true_swing)}</td><td class="num">${fmt(t.base_gotv + t.lean_support)}</td><td class="num" style="color:var(--dem-lt);">${fmt(t.weak_dem)}</td></tr>`;
   }).join("");
+
   const segmentRows = CON.segments.map(seg => {
     const signals = top(seg.consumer_signals, 3).map(([k, v]) => `${k} (${fmt(v)})`).join(" · ") || "No dominant signal";
     const methods = top(seg.vote_methods, 2).map(([k, v]) => `${k.replace("Likely ", "")} ${fmt(v)}`).join(" · ");
     return `<tr><td class="nm">${seg.segment}</td><td class="num">${fmt(seg.count)}</td><td>${signals}</td><td>${methods}</td></tr>`;
   }).join("");
-  const metricBtns = mapMetrics.map(m => `<button class="seg-btn ${m.key === analysisMetric ? "on" : ""}" data-analysis-metric="${m.key}">${m.label}</button>`).join("");
-  const mapTownRows = ((A.map && A.map.towns) || []).slice().sort((a, b) => (b[analysisMetric] || 0) - (a[analysisMetric] || 0)).map(t =>
-    `<div class="prow" role="button" tabindex="0" data-town="${t.town}"><span class="num" style="flex:1;">${t.town}</span><span class="num" style="color:var(--gold-lt);">${pc1(t[analysisMetric] || 0)}</span><span class="kicker" style="width:82px;text-align:right;">${fmt(t.targets)} tgt</span></div>`
-  ).join("");
 
   view.innerHTML =
     vhead("Fixed Universe", "var(--gold-lt)", "Analysis", "Aggregate SOTS + L2") +
-    `<div class="vrow" style="grid-template-columns:repeat(4,1fr);">
-      <div class="vcard big-stat"><div class="h-card">Gap After Base</div><div class="num" style="line-height:1;margin-top:6px;color:var(--rep-lt);">${fmt(V.gap_after_base)}</div><div class="lede">votes beyond base GOTV</div></div>
-      <div class="vcard big-stat"><div class="h-card">Base + Lean Gap</div><div class="num" style="line-height:1;margin-top:6px;color:var(--gold-lt);">${fmt(V.gap_after_base_plus_lean)}</div><div class="lede">net votes still required</div></div>
-      <div class="vcard big-stat"><div class="h-card">Persuasion Core</div><div class="num" style="line-height:1;margin-top:6px;color:var(--npa-lt);">${fmt(V.persuasion_core)}</div><div class="lede">swing + crossover pool</div></div>
-      <div class="vcard big-stat"><div class="h-card">Target Cushion</div><div class="num" style="line-height:1;margin-top:6px;color:var(--teal-lt);">${fmt(V.target_overage)}</div><div class="lede">targets over win number</div></div>
+    `<div class="wpanel cols-4" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px;">${kpis}</div>
+
+    <div class="read-banner" style="margin-bottom:16px;">
+      <div class="r-num" style="font-size:46px;line-height:1;color:var(--teal-lt);flex-shrink:0;">${pc1(V.base_share_of_win)}</div>
+      <div style="font-family:var(--ff-body);font-size:13.5px;line-height:1.55;color:var(--fg-muted);">Base GOTV covers this share of the win number. The rest is a clean <b style="color:var(--fg);font-weight:600;">persuasion-and-lean-support</b> problem — and most of it sits in ${A.town_strategy[0].town}.</div>
     </div>
 
-    <div class="vrow" style="grid-template-columns:1.7fr .9fr;margin-top:18px;align-items:start;">
-      <div class="vcard map-shell">
-        <div class="map-head">
-          <div class="map-title"><span class="h-card">Strategic Map</span><span class="num" style="font-size:30px;color:var(--fg);">${metric.label}</span></div>
-          <div class="seg">${metricBtns}</div>
-        </div>
-        <div id="amap"></div><div class="legend" id="amap-legend" style="margin-top:12px;"></div>
+    <div class="console-card" style="margin-bottom:16px;">
+      <div class="console-head">
+        <span class="rlabel">Strategic Map</span>
+        <div class="seg">${metricBtns}</div>
       </div>
-      <div class="vcard rank-panel" style="padding:20px 22px;">
-        <div class="h-card" style="margin-bottom:14px;">Town Rank</div>
-        <div style="display:flex;flex-direction:column;gap:8px;">${mapTownRows}</div>
-        <div class="story-card" style="margin-top:16px;padding:18px;">
-          <div class="h-card" style="color:var(--gold-lt);">Main Battlefield</div>
-          <div class="num" style="font-size:34px;color:var(--npa-lt);">Colchester</div>
-          <p>${pc1(A.town_strategy[0].persuasion_share)} of the persuasion core sits here.</p>
+      <div class="console-body" style="display:grid;grid-template-columns:1.6fr 1fr;">
+        <div class="amap-wrap" style="position:relative;border-right:1px solid var(--border);">
+          <div id="amap" style="height:540px;border:0;border-radius:0;"></div>
+          <div id="amap-legend" class="amap-legend"></div>
+        </div>
+        <div style="padding:18px;">
+          <div style="background:rgba(15,33,64,.6);border:1px solid var(--border-strong);border-radius:8px;padding:16px 18px;margin-bottom:16px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <span class="r-num" style="font-size:22px;color:var(--fg);">${analysisTown || "—"}</span>
+              <span class="rlabel" style="color:${jobAccent};">${job}</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 16px;">${detailRows}</div>
+          </div>
+          <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;">
+            <span class="rlabel">Town Rank</span><span class="rlabel" style="color:${ms.hex === "#F0B82A" ? "var(--gold-lt)" : "var(--teal-lt)"};">${METRIC_SHORT[metric.key] || metric.label}</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;">${rankRows}</div>
         </div>
       </div>
     </div>
 
-    <div class="vrow" style="grid-template-columns:1.15fr 1fr;margin-top:18px;">
-      <div class="story-card">
-        <div class="h-card" style="color:var(--teal-lt);">Read</div>
-        <div class="num" style="color:var(--fg);">${pc1(V.base_share_of_win)}</div>
-        <p>Base GOTV covers this share of the win number. The rest is a clean persuasion-and-lean-support problem.</p>
+    <div class="wpanel" style="grid-template-columns:340px 1fr;gap:16px;align-items:start;">
+      <div class="vcard" style="padding:20px 22px;">
+        <div class="rlabel" style="margin-bottom:16px;">Program Mix</div>
+        ${programRows}
+      </div>
+      <div class="vcard" style="padding:0;overflow:hidden;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;padding:16px 20px 12px;"><span class="rlabel">Town Decisioning</span><span class="rlabel" style="color:var(--gold-lt);">Program job by geography</span></div>
+        <div class="tbl-wrap" style="border:0;border-radius:0;border-top:1px solid var(--border);"><table><thead><tr><th>Town</th><th>Strategic job</th><th class="num">Targets</th><th class="num">Share</th><th class="num">Persuasion</th><th class="num">True Swing</th><th class="num">Base + Lean</th><th class="num">Weak D</th></tr></thead><tbody>${townRows}</tbody></table></div>
+      </div>
+    </div>
+
+    <div class="wpanel" style="grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;">
+      <div class="vcard" style="padding:20px 22px;">
+        <div class="rlabel" style="margin-bottom:14px;">Consumer / L2 Texture</div>
+        <div style="display:flex;flex-direction:column;gap:11px;">${barRows(CON.expanded_l2_signals, V.targets, "var(--gold-lt)")}</div>
+        <div style="height:1px;background:var(--border);margin:16px 0;"></div>
+        <div class="rctx">${CON.reads[1]}</div>
       </div>
       <div class="vcard" style="padding:20px 22px;">
-        <div class="h-card" style="margin-bottom:14px;">Program Mix</div>
-        <div class="mix-bars">${programRows}</div>
-      </div>
-    </div>
-
-    <div class="vcard" style="padding:18px 20px;margin-top:14px;">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;"><span class="h-card">Town Decisioning</span><span class="kicker" style="color:var(--gold-lt);">fixed universe · program job by geography</span></div>
-      <div class="tbl-wrap"><table><thead><tr><th>Town</th><th>Strategic job</th><th class="num">Targets</th><th class="num">Share</th><th class="num">Persuasion</th><th class="num">True Swing</th><th class="num">Base + Lean</th><th class="num">Weak D</th></tr></thead><tbody>${townRows}</tbody></table></div>
-    </div>
-
-    <div class="vrow" style="grid-template-columns:1fr 1fr;margin-top:14px;">
-      <div class="vcard" style="padding:18px 20px;">
-        <div class="h-card" style="margin-bottom:12px;">Consumer / L2 Texture</div>
-        <div style="display:flex;flex-direction:column;gap:10px;">${barRows(CON.expanded_l2_signals, V.targets, "var(--gold-lt)")}</div>
+        <div class="rlabel" style="margin-bottom:14px;">Vote Method + Age</div>
+        <div style="display:flex;flex-direction:column;gap:11px;">${barRows(CON.vote_methods, V.targets, "var(--teal-lt)")}</div>
         <div style="height:1px;background:var(--border);margin:16px 0;"></div>
-        <div class="lede">${CON.reads[1]}</div>
-      </div>
-      <div class="vcard" style="padding:18px 20px;">
-        <div class="h-card" style="margin-bottom:12px;">Vote Method + Age</div>
-        <div style="display:flex;flex-direction:column;gap:10px;">${barRows(CON.vote_methods, V.targets, "var(--teal-lt)")}</div>
-        <div style="height:1px;background:var(--border);margin:16px 0;"></div>
-        <div style="display:flex;flex-direction:column;gap:10px;">${barRows(CON.age_bands, V.targets, "var(--npa-lt)")}</div>
+        <div style="display:flex;flex-direction:column;gap:11px;">${barRows(CON.age_bands, V.targets, "var(--npa-lt)")}</div>
       </div>
     </div>
 
-    <div class="vcard" style="padding:18px 20px;margin-top:14px;">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;"><span class="h-card">Segment Read</span><span class="kicker" style="color:var(--fg-dim);">aggregate L2 signals only</span></div>
-      <div class="tbl-wrap"><table><thead><tr><th>Segment</th><th class="num">Count</th><th>Consumer signals</th><th>Method tendency</th></tr></thead><tbody>${segmentRows}</tbody></table></div>
+    <div class="vcard" style="padding:0;overflow:hidden;margin-top:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;padding:16px 20px 12px;"><span class="rlabel">Segment Read</span><span class="rlabel" style="color:var(--fg-dim);">aggregate L2 signals only</span></div>
+      <div class="tbl-wrap" style="border:0;border-radius:0;border-top:1px solid var(--border);"><table><thead><tr><th>Segment</th><th class="num">Count</th><th>Consumer signals</th><th>Method tendency</th></tr></thead><tbody>${segmentRows}</tbody></table></div>
     </div>
 
     <div class="vbanner"><span class="tag" style="font-size:10px;color:var(--gold);">Guardrail</span><span class="kicker" style="text-transform:none;letter-spacing:0;font-family:var(--ff-body);font-size:10.5px;">Aggregate signals only. No voter-level records are shown.</span></div>`;
 
   view.querySelectorAll("[data-analysis-metric]").forEach(btn => btn.onclick = () => { analysisMetric = btn.dataset.analysisMetric; route(); });
-  view.querySelectorAll("[data-town]").forEach(row => {
-    const open = () => { const t = TOWNS[row.dataset.town]; if (t) drillTown(t, "town"); };
-    row.onclick = open;
-    row.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } };
+  view.querySelectorAll("[data-atown]").forEach(eln => {
+    const go = () => selectAnalysisTown(eln.dataset.atown);
+    eln.onclick = go;
+    eln.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } };
   });
-  setTimeout(() => analysisMap("amap", metric), 30);
+  setTimeout(() => analysisMap("amap", metric, analysisTown), 30);
 };
 
-function analysisMap(id, metric) {
+function analysisMap(id, metric, selTown) {
   const host = document.getElementById(id);
   if (!host || !GEO || !GEO.towns || !TARGET || !TARGET.analysis || !TARGET.analysis.map) return;
   const rows = TARGET.analysis.map.towns || [];
   const byTown = Object.fromEntries(rows.map(t => [t.town, t]));
+  const ms = METRIC_STYLE[metric.key] || METRIC_STYLE.base_lean_rate;
   const vals = rows.map(t => t[metric.key] || 0);
   const min = Math.min(...vals), max = Math.max(...vals);
-  const fmtMetric = v => metric.suffix === "%" ? pc1(v) : fmt(v);
   const color = v => {
-    const bases = {
-      persuasion_share: [167, 139, 250],
-      true_swing_rate: [240, 184, 42],
-      base_lean_rate: [34, 170, 188],
-      outdoor_l2_rate: [224, 85, 85],
-      election_day_rate: [96, 165, 250],
-    };
-    const base = bases[metric.key] || [34, 170, 188];
     const lo = [18, 33, 51];
     const t = max > min ? (v - min) / (max - min) : .5;
-    return `rgb(${lo.map((c, i) => Math.round(c + (base[i] - c) * (0.22 + .78 * t))).join(",")})`;
+    return `rgb(${lo.map((c, i) => Math.round(c + (ms.rgb[i] - c) * (0.22 + .78 * t))).join(",")})`;
   };
   const map = L.map(id, { scrollWheelZoom: false, attributionControl: false });
   L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png", { maxZoom: 18 }).addTo(map);
   L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png", { maxZoom: 18, pane: "markerPane" }).addTo(map);
-  map.fitBounds(GEO.bounds, { padding: [18, 18] });
+  map.fitBounds(GEO.bounds, { padding: [26, 26] });
   (window._maps = window._maps || []).push(map);
   const layer = L.geoJSON(GEO.towns, {
     style: f => {
-      const row = byTown[f.properties.town];
-      const v = row ? row[metric.key] || 0 : 0;
-      return { fillColor: row ? color(v) : "#0F1A2C", fillOpacity: .88, color: "#06111F", weight: 1.2 };
+      const row = byTown[f.properties.town], sel = f.properties.town === selTown;
+      return { fillColor: row ? color(row[metric.key] || 0) : "#0F1A2C", fillOpacity: .9, color: sel ? "#F0B82A" : "#06111F", weight: sel ? 3 : 1.2 };
     },
     onEachFeature: (f, lyr) => {
-      const row = byTown[f.properties.town], town = TOWNS[f.properties.town];
-      if (!row || !town) return;
+      const row = byTown[f.properties.town];
+      if (!row) return;
       const v = row[metric.key] || 0;
-      lyr.bindTooltip(`<b>${row.town}</b><br>${metric.label}: ${fmtMetric(v)}<br>${fmt(row.targets)} targets<br>${fmt(row.persuasion)} persuasion`, { sticky: true });
-      lyr.on({ mouseover: e => e.target.setStyle({ weight: 3, color: "#22AABC" }), mouseout: e => layer.resetStyle(e.target), click: () => drillTown(town, "town") });
+      lyr.bindTooltip(`<div class="n">${row.town}</div><div class="v">${pc1(v)}</div>`, { permanent: true, direction: "center", className: "amap-lbl", opacity: 1 });
+      lyr.on({ mouseover: e => e.target.setStyle({ weight: 3, color: "#F0B82A" }), mouseout: e => layer.resetStyle(e.target), click: () => selectAnalysisTown(row.town) });
     }
   }).addTo(map);
   const lg = document.getElementById("amap-legend");
-  if (lg) lg.innerHTML = `<span class="muted">${metric.label}:</span>` +
-    `<span><i style="background:${color(min)}"></i>${fmtMetric(min)}</span>` +
-    `<span><i style="background:${color(max)}"></i>${fmtMetric(max)}</span>`;
+  if (lg) lg.innerHTML = `<div class="rlabel" style="margin-bottom:8px;">${ms.legend}</div>
+    <div style="width:150px;height:10px;border-radius:2px;background:linear-gradient(90deg,${color(min)},${color(max)});"></div>
+    <div style="display:flex;justify-content:space-between;margin-top:5px;"><span class="r-num" style="font-size:10px;color:var(--fg-muted);">${pc1(min)}</span><span class="r-num" style="font-size:10px;color:var(--fg-muted);">${pc1(max)}</span></div>`;
 }
 
 /* ───────────────── TARGETS ───────────────── */
