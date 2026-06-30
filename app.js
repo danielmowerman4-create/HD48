@@ -382,11 +382,10 @@ function colorForMargin(m) { // m = D − R, two-party points
 ROUTES.results = function (view) {
   if (!RES) { view.appendChild(el("div", "note", "<div>Results data not loaded.</div>")); return; }
   if (!RES.races[resRace]) resRace = RES.order[0];
-  pageHead(view, "Election Results",
-    RES.note || "Official CT Secretary of the State returns. Presidential rows are full-town totals; House rows are district returns.");
+  view.insertAdjacentHTML("beforeend", vhead("Certified Returns", "var(--teal-lt)", "Results", RES.note || "CT SOTS"));
 
   // race selector
-  const seg = el("div", "seg"); seg.style.marginBottom = "20px";
+  const seg = el("div", "seg"); seg.style.marginBottom = "18px";
   seg.innerHTML = RES.order.map(k => `<button class="seg-btn ${k === resRace ? "on" : ""}" data-k="${k}">${RES.races[k].label}</button>`).join("");
   seg.querySelectorAll("button").forEach(b => b.onclick = () => { resRace = b.dataset.k; route(); });
   view.appendChild(seg);
@@ -561,19 +560,19 @@ ROUTES.verdict = function (view) {
   const gmax = Math.max(...gv) || 1; const spPts = gv.map((v, i) => `${8 + i * 96},${86 - (v / gmax) * 66}`);
 
   view.innerHTML =
-    vhead("Election Overview · 2026 Cycle", "var(--teal-lt)", "State Of The Race", "Model · " + (TARGET ? TARGET.generated_at.slice(0, 10) + " · SOTS + L2 target model" : C.generated_at.slice(0, 10) + " · SOTS file + 2020–24 returns")) +
+    vhead("2026 Defense", "var(--teal-lt)", "Race Dashboard", (TARGET ? TARGET.generated_at.slice(0, 10) + " · SOTS + L2" : C.generated_at.slice(0, 10) + " · SOTS + returns")) +
     `<div class="vrow" style="grid-template-columns:1.05fr 1fr 1fr;">
       <div class="vcard" style="border-color:var(--border-lt);padding:18px 20px;">
-        <div class="h-card">Race Rating</div>
+        <div class="h-card">Rating</div>
         <div class="num" style="font-size:54px;line-height:.9;color:${ratingCol};margin-top:6px;">${rating}</div>
-        <div class="h-card" style="margin-top:18px;display:flex;justify-content:space-between;"><span>Margin · recent cycles</span><span style="color:var(--fg-dim);">R ◂ ▸ D</span></div>
+        <div class="h-card" style="margin-top:18px;display:flex;justify-content:space-between;"><span>Cycle Margins</span><span style="color:var(--fg-dim);">R ◂ ▸ D</span></div>
         <div style="display:flex;flex-direction:column;gap:7px;margin-top:10px;">${histRows}</div>
-        <div class="kicker" style="font-size:9px;margin-top:9px;color:var(--fg-dim);">P = president · H = state house (post-2021 district)</div>
+        <div class="kicker" style="font-size:9px;margin-top:9px;color:var(--fg-dim);">P = president · H = state house</div>
       </div>
       <div class="vcard" style="padding:18px 20px;display:flex;flex-direction:column;">
         <div class="h-card">Votes To Win</div>
         <div class="num" style="font-size:52px;line-height:1;color:var(--fg);margin-top:4px;">${fmt(win)}</div>
-        <div class="lede" style="margin-top:2px;">50% + 1 of ${fmt(winBase)} ${TARGET ? "planning turnout" : "(" + myYear + " House turnout)"}</div>
+        <div class="lede" style="margin-top:2px;">50% + 1 of ${fmt(winBase)}</div>
         <div style="margin-top:auto;padding-top:20px;">
           <div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span class="tag" style="color:var(--teal-lt);">${myLast} ’${String(myYear).slice(2)} · ${fmt(myV)}</span><span class="tag" style="color:${cleared >= 0 ? "var(--teal-lt)" : "var(--rep-lt)"};">${cleared >= 0 ? "Cleared +" + fmt(cleared) : "Short " + fmt(-cleared)}</span></div>
           <div style="position:relative;height:16px;border-radius:8px;background:#0F1A2C;overflow:hidden;">
@@ -584,7 +583,7 @@ ROUTES.verdict = function (view) {
         </div>
       </div>
       <div class="vcard" style="padding:18px 20px;">
-        <div class="h-card">${TARGET ? "Target Universe" : "Target Universes"}</div>
+        <div class="h-card">Universe</div>
         ${TS ? `<div class="num" style="font-size:31px;line-height:1;margin-top:5px;color:var(--fg);">${fmt(TS.targets)}<span style="font-size:16px;color:var(--fg-muted);"> of ${fmt(TS.likely_voters)}</span></div>` : ""}
         <div style="display:flex;height:28px;border-radius:var(--r-lg);overflow:hidden;margin-top:12px;">
           <div class="num" style="width:${pBase}%;background:var(--teal);display:flex;align-items:center;justify-content:center;color:#04181c;font-size:12px;">${fmtK(base)}</div>
@@ -592,33 +591,33 @@ ROUTES.verdict = function (view) {
           <div class="num" style="width:${pReg}%;background:var(--npa);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;">${fmtK(regist)}</div>
         </div>
         <div style="margin-top:15px;display:flex;flex-direction:column;gap:10px;">
-          <div style="display:flex;align-items:center;gap:9px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--teal);flex-shrink:0;"></span><span class="tag" style="color:var(--fg);">${TARGET ? "Base GOTV" : "High-turnout base"}</span><span class="num" style="margin-left:auto;color:var(--teal-lt);">${Math.round(pBase)}%</span></div>
+          <div style="display:flex;align-items:center;gap:9px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--teal);flex-shrink:0;"></span><span class="tag" style="color:var(--fg);">${TARGET ? "Base" : "High-turnout"}</span><span class="num" style="margin-left:auto;color:var(--teal-lt);">${Math.round(pBase)}%</span></div>
           <div style="display:flex;align-items:center;gap:9px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--gold);flex-shrink:0;"></span><span class="tag" style="color:var(--fg);">${TARGET ? "Persuasion" : "Unaffiliated persuasion"}</span><span class="num" style="margin-left:auto;color:var(--gold-lt);">${Math.round(pPersu)}%</span></div>
-          <div style="display:flex;align-items:center;gap:9px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--npa);flex-shrink:0;"></span><span class="tag" style="color:var(--fg);">${TARGET ? "Weak D crossover" : "Newly registered"}</span><span class="num" style="margin-left:auto;color:var(--npa-lt);">${Math.round(pReg)}%</span></div>
+          <div style="display:flex;align-items:center;gap:9px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--npa);flex-shrink:0;"></span><span class="tag" style="color:var(--fg);">${TARGET ? "Crossover" : "New reg."}</span><span class="num" style="margin-left:auto;color:var(--npa-lt);">${Math.round(pReg)}%</span></div>
         </div>
         ${TARGET ? `<a class="chip" style="margin-top:14px;" href="#targets">Open Targets</a>` : ""}
       </div>
     </div>
 
-    <div style="display:flex;align-items:center;gap:12px;margin:24px 0 12px;"><span class="tag" style="font-size:12px;letter-spacing:2px;color:var(--gold-lt);">The Three Things That Decide It</span><span style="flex:1;height:1px;background:var(--border);"></span></div>
+    <div class="visual-rule"><span class="tag">Deciders</span><span></span></div>
     <div class="vrow" style="grid-template-columns:repeat(3,1fr);">
       <div style="background:linear-gradient(160deg,rgba(212,160,23,.10),rgba(15,33,64,.4));border:1px solid rgba(212,160,23,.3);border-radius:var(--r-lg);padding:20px;">
-        <div class="kicker" style="color:var(--gold-lt);">01 · The Margin</div>
+        <div class="kicker" style="color:var(--gold-lt);">01 · Margin</div>
         <div class="num" style="font-size:48px;line-height:1;margin-top:6px;">${fmt(dec)}</div>
-        <div class="kicker" style="margin-top:2px;">Decisive votes · 2024 house</div>
-        <div class="tag" style="display:block;margin-top:14px;color:var(--fg);">Won in the margins.</div>
+        <div class="kicker" style="margin-top:2px;">2024 decisive votes</div>
+        <div class="tag" style="display:block;margin-top:14px;color:var(--fg);">Protect the edge.</div>
       </div>
       <div style="background:linear-gradient(160deg,rgba(26,139,154,.12),rgba(15,33,64,.4));border:1px solid rgba(26,139,154,.3);border-radius:var(--r-lg);padding:20px;">
-        <div class="kicker" style="color:var(--teal-lt);">02 · The Map</div>
+        <div class="kicker" style="color:var(--teal-lt);">02 · Map</div>
         <div class="num" style="font-size:48px;line-height:1;margin-top:6px;">${concShare}<span style="font-size:22px;color:var(--fg-muted);">%</span></div>
-        <div class="kicker" style="margin-top:2px;">Of voters in ${k} precincts</div>
-        <div class="tag" style="display:block;margin-top:14px;color:var(--fg);">Concentrate, don’t spread.</div>
+        <div class="kicker" style="margin-top:2px;">Voters in ${k} precincts</div>
+        <div class="tag" style="display:block;margin-top:14px;color:var(--fg);">Concentrate turf.</div>
       </div>
       <div style="background:linear-gradient(160deg,rgba(124,58,237,.14),rgba(15,33,64,.4));border:1px solid rgba(124,58,237,.34);border-radius:var(--r-lg);padding:20px;">
-        <div class="kicker" style="color:var(--npa-lt);">03 · The Voters</div>
+        <div class="kicker" style="color:var(--npa-lt);">03 · Voters</div>
         <div class="num" style="font-size:48px;line-height:1;margin-top:6px;">${fmt(persu)}</div>
-        <div class="kicker" style="margin-top:2px;">${TARGET ? "Modeled persuasion targets" : "Persuadable unaffiliateds"}</div>
-        <div class="tag" style="display:block;margin-top:14px;color:var(--fg);">The swing, not the base.</div>
+        <div class="kicker" style="margin-top:2px;">${TARGET ? "Persuasion targets" : "Persuadables"}</div>
+        <div class="tag" style="display:block;margin-top:14px;color:var(--fg);">Win the swing.</div>
       </div>
     </div>
 
@@ -639,7 +638,7 @@ ROUTES.verdict = function (view) {
         <div style="background:var(--navy-card);padding:13px 16px;"><div class="h-card">${myLast} ’${String(myYear).slice(2)}</div><div class="num" style="font-size:23px;margin-top:4px;">${fmt(myV)}</div></div>
       </div>
     </div>
-    <div class="vbanner"><span class="tag" style="font-size:10px;color:var(--gold);">Note</span><span class="kicker" style="text-transform:none;letter-spacing:0;font-family:var(--ff-body);font-size:10.5px;">Registration, turnout & results are from the CT SOTS file and certified returns. The win number and target universes are projections for planning.</span></div>`;
+    <div class="vbanner"><span class="tag" style="font-size:10px;color:var(--gold);">Source</span><span class="kicker" style="text-transform:none;letter-spacing:0;font-family:var(--ff-body);font-size:10.5px;">SOTS file, certified returns, and planning-model targets.</span></div>`;
 };
 
 /* ───────────────── ANALYSIS ───────────────── */
@@ -685,7 +684,7 @@ ROUTES.analysis = function (view) {
   ).join("");
 
   view.innerHTML =
-    vhead("Fixed Universe · Strategic Read", "var(--gold-lt)", "Analysis", "Aggregate SOTS + L2 model") +
+    vhead("Fixed Universe", "var(--gold-lt)", "Analysis", "Aggregate SOTS + L2") +
     `<div class="vrow" style="grid-template-columns:repeat(4,1fr);">
       <div class="vcard" style="padding:16px 18px;"><div class="h-card">Gap After Base</div><div class="num" style="font-size:38px;line-height:1;margin-top:5px;color:var(--rep-lt);">${fmt(V.gap_after_base)}</div><div class="lede">votes beyond base GOTV</div></div>
       <div class="vcard" style="padding:16px 18px;"><div class="h-card">Gap After Base + Lean</div><div class="num" style="font-size:38px;line-height:1;margin-top:5px;color:var(--gold-lt);">${fmt(V.gap_after_base_plus_lean)}</div><div class="lede">net votes to clear if lean support holds</div></div>
@@ -694,11 +693,10 @@ ROUTES.analysis = function (view) {
     </div>
 
     <div class="vrow" style="grid-template-columns:1.15fr 1fr;margin-top:14px;">
-      <div class="narr" style="margin:0;">
-        <h3>Consultant Read</h3>
-        <p><b>The universe is sufficient, but not self-executing.</b> Base GOTV covers <b>${pc1(V.base_share_of_win)}</b> of the win number; the campaign still needs persuasion or lean-support conversion to finish the path.</p>
-        <p><b>The key number is ${fmt(V.gap_after_base_plus_lean)}.</b> If base and lean-support voters hold, that is the remaining net vote problem out of ${fmt(V.true_swing + V.weak_dem)} swing and crossover targets.</p>
-        <p><b>Colchester is the persuasion battlefield.</b> It holds ${pc1(A.town_strategy[0].persuasion_share)} of the persuasion core and almost all true-swing targets. The other towns are more about holding the line.</p>
+      <div class="insight-strip">
+        <div><div class="h-card">Base Coverage</div><div class="num" style="font-size:34px;margin-top:6px;color:var(--teal-lt);">${pc1(V.base_share_of_win)}</div><div class="lede">GOTV share of win number</div></div>
+        <div><div class="h-card">Net Problem</div><div class="num" style="font-size:34px;margin-top:6px;color:var(--gold-lt);">${fmt(V.gap_after_base_plus_lean)}</div><div class="lede">After base + lean hold</div></div>
+        <div><div class="h-card">Main Battlefield</div><div class="num" style="font-size:34px;margin-top:6px;color:var(--npa-lt);">Colchester</div><div class="lede">${pc1(A.town_strategy[0].persuasion_share)} of persuasion core</div></div>
       </div>
       <div class="vcard" style="padding:18px 20px;">
         <div class="h-card" style="margin-bottom:12px;">Program Mix</div>
@@ -718,7 +716,7 @@ ROUTES.analysis = function (view) {
         <div class="h-card" style="margin-bottom:12px;">Town Rank · ${metric.label}</div>
         <div style="display:flex;flex-direction:column;gap:6px;">${mapTownRows}</div>
         <div style="height:1px;background:var(--border);margin:16px 0;"></div>
-        <div class="lede">Use this map to turn the fixed universe into geography: where to persuade, where to protect, where the L2 consumer texture is strongest, and where Election Day operations carry the load.</div>
+        <div class="lede">A geographic read of persuasion, protection, consumer texture, and Election Day load.</div>
       </div>
     </div>
 
@@ -747,7 +745,7 @@ ROUTES.analysis = function (view) {
       <div class="tbl-wrap"><table><thead><tr><th>Segment</th><th class="num">Count</th><th>Consumer signals</th><th>Method tendency</th></tr></thead><tbody>${segmentRows}</tbody></table></div>
     </div>
 
-    <div class="vbanner"><span class="tag" style="font-size:10px;color:var(--gold);">Data Guardrail</span><span class="kicker" style="text-transform:none;letter-spacing:0;font-family:var(--ff-body);font-size:10.5px;">This page uses aggregate L2 and SOTS-derived signals. It does not expose voter-level names, addresses, phones or scores.</span></div>`;
+    <div class="vbanner"><span class="tag" style="font-size:10px;color:var(--gold);">Guardrail</span><span class="kicker" style="text-transform:none;letter-spacing:0;font-family:var(--ff-body);font-size:10.5px;">Aggregate signals only. No voter-level records are shown.</span></div>`;
 
   view.querySelectorAll("[data-analysis-metric]").forEach(btn => btn.onclick = () => { analysisMetric = btn.dataset.analysisMetric; route(); });
   view.querySelectorAll("[data-town]").forEach(row => {
@@ -851,12 +849,12 @@ ROUTES.targets = function (view) {
   const exportLinks = publicExports.map(x => `<a class="chip" href="${x.href}" download>${x.label}</a>`).join("");
 
   view.innerHTML =
-    vhead("2026 General Election", "var(--gold-lt)", "Target Universe", "Generated " + TARGET.generated_at.replace("T", " · ").slice(0, 21)) +
+    vhead("2026 General", "var(--gold-lt)", "Targets", "Generated " + TARGET.generated_at.slice(0, 10)) +
     `<div class="vrow" style="grid-template-columns:repeat(4,1fr);">
-      <div class="vcard" style="padding:16px 18px;"><div class="h-card">Likely Voter Pool</div><div class="num" style="font-size:38px;line-height:1;margin-top:5px;">${fmt(s.likely_voters)}</div><div class="lede">Very High, High and Medium tiers</div></div>
-      <div class="vcard" style="padding:16px 18px;"><div class="h-card">Planning Turnout</div><div class="num" style="font-size:38px;line-height:1;margin-top:5px;color:var(--teal-lt);">${fmt(TARGET.planning_turnout)}</div><div class="lede">Campaign planning assumption</div></div>
-      <div class="vcard" style="padding:16px 18px;"><div class="h-card">Win Number</div><div class="num" style="font-size:38px;line-height:1;margin-top:5px;color:var(--gold-lt);">${fmt(TARGET.win_number)}</div><div class="lede">50% + 1 of planning turnout</div></div>
-      <div class="vcard" style="padding:16px 18px;"><div class="h-card">One Target Universe</div><div class="num" style="font-size:38px;line-height:1;margin-top:5px;color:var(--npa-lt);">${fmt(s.targets)}</div><div class="lede">${pc1(s.target_rate)} of likely pool</div></div>
+      <div class="vcard" style="padding:16px 18px;"><div class="h-card">Likely Pool</div><div class="num" style="font-size:38px;line-height:1;margin-top:5px;">${fmt(s.likely_voters)}</div><div class="lede">High + medium tiers</div></div>
+      <div class="vcard" style="padding:16px 18px;"><div class="h-card">Turnout Plan</div><div class="num" style="font-size:38px;line-height:1;margin-top:5px;color:var(--teal-lt);">${fmt(TARGET.planning_turnout)}</div><div class="lede">Working assumption</div></div>
+      <div class="vcard" style="padding:16px 18px;"><div class="h-card">Win Number</div><div class="num" style="font-size:38px;line-height:1;margin-top:5px;color:var(--gold-lt);">${fmt(TARGET.win_number)}</div><div class="lede">50% + 1</div></div>
+      <div class="vcard" style="padding:16px 18px;"><div class="h-card">Targets</div><div class="num" style="font-size:38px;line-height:1;margin-top:5px;color:var(--npa-lt);">${fmt(s.targets)}</div><div class="lede">${pc1(s.target_rate)} of likely pool</div></div>
     </div>
 
     <div class="vrow" style="grid-template-columns:1.1fr 1fr;margin-top:14px;">
@@ -873,7 +871,7 @@ ROUTES.targets = function (view) {
     <div class="vrow" style="grid-template-columns:1fr 1fr;margin-top:14px;">
       <div class="vcard" style="padding:18px 20px;">
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;"><span class="h-card">Persuasion Core</span><span class="num" style="color:var(--gold-lt);">${fmt(s.persuasion_targets)}</span></div>
-        <div class="lede">Lean-support and true-swing voters after removing U/IT voters with Democratic or liberal evidence.</div>
+        <div class="lede">Lean support + true swing after exclusions.</div>
         <div style="margin-top:12px;display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;">
           <div style="background:var(--navy-card);padding:12px 14px;"><div class="h-card">U/IT Not Targeted</div><div class="num" style="font-size:24px;color:var(--rep-lt);">${fmt(s.u_it_not_targeted)}</div></div>
           <div style="background:var(--navy-card);padding:12px 14px;"><div class="h-card">Not Targeted Overall</div><div class="num" style="font-size:24px;color:var(--fg-muted);">${fmt(s.not_targeted)}</div></div>
@@ -912,7 +910,7 @@ ROUTES.targets = function (view) {
       <div class="h-card" style="margin-bottom:12px;">Public Summaries</div>
       <div style="display:flex;gap:9px;flex-wrap:wrap;">${exportLinks}</div>
     </div>
-    <div class="vbanner"><span class="tag" style="font-size:10px;color:var(--gold);">Model Note</span><span class="kicker" style="text-transform:none;letter-spacing:0;font-family:var(--ff-body);font-size:10.5px;">${TARGET.notes.join(" ")}</span></div>`;
+    <div class="vbanner"><span class="tag" style="font-size:10px;color:var(--gold);">Model</span><span class="kicker" style="text-transform:none;letter-spacing:0;font-family:var(--ff-body);font-size:10.5px;">Fixed universe for campaign planning; see public summaries for detail.</span></div>`;
 };
 
 /* ───────────────── BATTLEFIELD ───────────────── */
