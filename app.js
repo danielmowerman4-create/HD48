@@ -643,6 +643,7 @@ ROUTES.verdict = function (view) {
 };
 
 /* ───────────────── ANALYSIS ───────────────── */
+let analysisMetric = "persuasion_share";
 ROUTES.analysis = function (view) {
   if (!TARGET || !TARGET.analysis) {
     view.innerHTML = vhead("Strategic Analysis", "var(--gold-lt)", "Analysis Not Loaded", "Run build/import_targets.py") +
@@ -650,6 +651,9 @@ ROUTES.analysis = function (view) {
     return;
   }
   const A = TARGET.analysis, V = A.vote_path, CON = A.consumer;
+  const mapMetrics = (A.map && A.map.metrics) || [];
+  if (!mapMetrics.some(m => m.key === analysisMetric)) analysisMetric = mapMetrics[0] ? mapMetrics[0].key : "persuasion_share";
+  const metric = mapMetrics.find(m => m.key === analysisMetric) || { key: analysisMetric, label: "Analysis metric", suffix: "" };
   const top = (obj, n) => Object.entries(obj || {}).sort((a, b) => b[1] - a[1]).slice(0, n || 6);
   const barRows = (obj, total, color) => top(obj, 8).map(([k, v]) => {
     const w = total ? Math.max(2, 100 * v / total) : 0;
@@ -659,11 +663,11 @@ ROUTES.analysis = function (view) {
   }).join("");
   const programRows = A.program_mix.map((r, i) => {
     const colors = ["var(--teal-lt)", "var(--gold-lt)", "var(--npa-lt)", "var(--dem-lt)"];
-    return `<div style="display:grid;grid-template-columns:minmax(160px,1fr) 70px 54px 1.1fr;gap:12px;align-items:center;">
+    return `<div style="display:grid;grid-template-columns:minmax(0,1fr) 62px 48px;gap:8px;align-items:center;">
       <span><span class="tag" style="color:var(--fg);">${r.label}</span><span class="kicker" style="display:block;font-size:9px;">${r.role}</span></span>
       <span class="num" style="text-align:right;color:${colors[i]};">${fmt(r.count)}</span>
       <span class="num" style="text-align:right;color:${colors[i]};">${pc1(r.share)}</span>
-      <span class="scorebar" style="margin:0;"><i style="width:${r.share}%;background:${colors[i]};"></i></span></div>`;
+      <span class="scorebar" style="grid-column:1/-1;margin:0;"><i style="width:${r.share}%;background:${colors[i]};"></i></span></div>`;
   }).join("");
   const townRows = A.town_strategy.map(t => {
     const job = t.true_swing > 500 ? "Persuasion battlefield" : "Base / lean protection";
@@ -675,6 +679,10 @@ ROUTES.analysis = function (view) {
     const methods = top(seg.vote_methods, 2).map(([k, v]) => `${k.replace("Likely ", "")} ${fmt(v)}`).join(" · ");
     return `<tr><td class="nm">${seg.segment}</td><td class="num">${fmt(seg.count)}</td><td>${signals}</td><td>${methods}</td></tr>`;
   }).join("");
+  const metricBtns = mapMetrics.map(m => `<button class="seg-btn ${m.key === analysisMetric ? "on" : ""}" data-analysis-metric="${m.key}">${m.label}</button>`).join("");
+  const mapTownRows = ((A.map && A.map.towns) || []).slice().sort((a, b) => (b[analysisMetric] || 0) - (a[analysisMetric] || 0)).map(t =>
+    `<div class="prow" role="button" tabindex="0" data-town="${t.town}"><span class="num" style="font-size:15px;flex:1;">${t.town}</span><span class="num" style="color:var(--gold-lt);">${pc1(t[analysisMetric] || 0)}</span><span class="kicker" style="width:70px;text-align:right;">${fmt(t.targets)} tgt</span></div>`
+  ).join("");
 
   view.innerHTML =
     vhead("Fixed Universe · Strategic Read", "var(--gold-lt)", "Analysis", "Aggregate SOTS + L2 model") +
@@ -695,6 +703,22 @@ ROUTES.analysis = function (view) {
       <div class="vcard" style="padding:18px 20px;">
         <div class="h-card" style="margin-bottom:12px;">Program Mix</div>
         <div style="display:flex;flex-direction:column;gap:10px;">${programRows}</div>
+      </div>
+    </div>
+
+    <div class="vrow" style="grid-template-columns:1.6fr 1fr;margin-top:14px;">
+      <div class="vcard" style="padding:18px 20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+          <span class="h-card">Strategic Map · ${metric.label}</span>
+          <div class="seg">${metricBtns}</div>
+        </div>
+        <div id="amap"></div><div class="legend" id="amap-legend" style="margin-top:10px;"></div>
+      </div>
+      <div class="vcard" style="padding:18px 20px;">
+        <div class="h-card" style="margin-bottom:12px;">Town Rank · ${metric.label}</div>
+        <div style="display:flex;flex-direction:column;gap:6px;">${mapTownRows}</div>
+        <div style="height:1px;background:var(--border);margin:16px 0;"></div>
+        <div class="lede">Use this map to turn the fixed universe into geography: where to persuade, where to protect, where the L2 consumer texture is strongest, and where Election Day operations carry the load.</div>
       </div>
     </div>
 
@@ -724,7 +748,61 @@ ROUTES.analysis = function (view) {
     </div>
 
     <div class="vbanner"><span class="tag" style="font-size:10px;color:var(--gold);">Data Guardrail</span><span class="kicker" style="text-transform:none;letter-spacing:0;font-family:var(--ff-body);font-size:10.5px;">This page uses aggregate L2 and SOTS-derived signals. It does not expose voter-level names, addresses, phones or scores.</span></div>`;
+
+  view.querySelectorAll("[data-analysis-metric]").forEach(btn => btn.onclick = () => { analysisMetric = btn.dataset.analysisMetric; route(); });
+  view.querySelectorAll("[data-town]").forEach(row => {
+    const open = () => { const t = TOWNS[row.dataset.town]; if (t) drillTown(t, "town"); };
+    row.onclick = open;
+    row.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } };
+  });
+  setTimeout(() => analysisMap("amap", metric), 30);
 };
+
+function analysisMap(id, metric) {
+  const host = document.getElementById(id);
+  if (!host || !GEO || !GEO.towns || !TARGET || !TARGET.analysis || !TARGET.analysis.map) return;
+  const rows = TARGET.analysis.map.towns || [];
+  const byTown = Object.fromEntries(rows.map(t => [t.town, t]));
+  const vals = rows.map(t => t[metric.key] || 0);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const fmtMetric = v => metric.suffix === "%" ? pc1(v) : fmt(v);
+  const color = v => {
+    const bases = {
+      persuasion_share: [167, 139, 250],
+      true_swing_rate: [240, 184, 42],
+      base_lean_rate: [34, 170, 188],
+      outdoor_l2_rate: [224, 85, 85],
+      election_day_rate: [96, 165, 250],
+    };
+    const base = bases[metric.key] || [34, 170, 188];
+    const lo = [18, 33, 51];
+    const t = max > min ? (v - min) / (max - min) : .5;
+    return `rgb(${lo.map((c, i) => Math.round(c + (base[i] - c) * (0.22 + .78 * t))).join(",")})`;
+  };
+  const map = L.map(id, { scrollWheelZoom: false, attributionControl: false });
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png", { maxZoom: 18 }).addTo(map);
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png", { maxZoom: 18, pane: "markerPane" }).addTo(map);
+  map.fitBounds(GEO.bounds, { padding: [18, 18] });
+  (window._maps = window._maps || []).push(map);
+  const layer = L.geoJSON(GEO.towns, {
+    style: f => {
+      const row = byTown[f.properties.town];
+      const v = row ? row[metric.key] || 0 : 0;
+      return { fillColor: row ? color(v) : "#0F1A2C", fillOpacity: .88, color: "#06111F", weight: 1.2 };
+    },
+    onEachFeature: (f, lyr) => {
+      const row = byTown[f.properties.town], town = TOWNS[f.properties.town];
+      if (!row || !town) return;
+      const v = row[metric.key] || 0;
+      lyr.bindTooltip(`<b>${row.town}</b><br>${metric.label}: ${fmtMetric(v)}<br>${fmt(row.targets)} targets<br>${fmt(row.persuasion)} persuasion`, { sticky: true });
+      lyr.on({ mouseover: e => e.target.setStyle({ weight: 3, color: "#22AABC" }), mouseout: e => layer.resetStyle(e.target), click: () => drillTown(town, "town") });
+    }
+  }).addTo(map);
+  const lg = document.getElementById("amap-legend");
+  if (lg) lg.innerHTML = `<span class="muted">${metric.label}:</span>` +
+    `<span><i style="background:${color(min)}"></i>${fmtMetric(min)}</span>` +
+    `<span><i style="background:${color(max)}"></i>${fmtMetric(max)}</span>`;
+}
 
 /* ───────────────── TARGETS ───────────────── */
 ROUTES.targets = function (view) {

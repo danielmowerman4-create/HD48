@@ -188,6 +188,125 @@ window.TARGET_UNIVERSE = {
         "Mixed Method": 606
       }
     },
+    "map": {
+      "metrics": [
+        {
+          "key": "persuasion_share",
+          "label": "Persuasion load",
+          "suffix": "%"
+        },
+        {
+          "key": "true_swing_rate",
+          "label": "True swing rate",
+          "suffix": "%"
+        },
+        {
+          "key": "base_lean_rate",
+          "label": "Base + lean protection",
+          "suffix": "%"
+        },
+        {
+          "key": "outdoor_l2_rate",
+          "label": "Outdoor / gun L2 texture",
+          "suffix": "%"
+        },
+        {
+          "key": "election_day_rate",
+          "label": "Election Day load",
+          "suffix": "%"
+        }
+      ],
+      "towns": [
+        {
+          "age_50_plus": 3351,
+          "age_50_plus_rate": 70.4,
+          "base_lean": 2395,
+          "base_lean_rate": 50.3,
+          "business_l2": 124,
+          "early_vote": 2251,
+          "early_vote_rate": 47.3,
+          "election_day": 1932,
+          "election_day_rate": 40.6,
+          "outdoor_l2": 790,
+          "outdoor_l2_rate": 16.6,
+          "persuasion": 2614,
+          "persuasion_share": 62.8,
+          "target_share": 59.8,
+          "targets": 4759,
+          "town": "Colchester",
+          "true_swing": 2296,
+          "true_swing_rate": 48.2,
+          "veteran_l2": 99,
+          "weak_dem": 68
+        },
+        {
+          "age_50_plus": 1182,
+          "age_50_plus_rate": 72.1,
+          "base_lean": 1562,
+          "base_lean_rate": 95.3,
+          "business_l2": 40,
+          "early_vote": 659,
+          "early_vote_rate": 40.2,
+          "election_day": 810,
+          "election_day_rate": 49.4,
+          "outdoor_l2": 334,
+          "outdoor_l2_rate": 20.4,
+          "persuasion": 798,
+          "persuasion_share": 19.2,
+          "target_share": 20.6,
+          "targets": 1639,
+          "town": "Lebanon",
+          "true_swing": 16,
+          "true_swing_rate": 1.0,
+          "veteran_l2": 51,
+          "weak_dem": 61
+        },
+        {
+          "age_50_plus": 609,
+          "age_50_plus_rate": 72.5,
+          "base_lean": 779,
+          "base_lean_rate": 92.7,
+          "business_l2": 19,
+          "early_vote": 255,
+          "early_vote_rate": 30.4,
+          "election_day": 476,
+          "election_day_rate": 56.7,
+          "outdoor_l2": 168,
+          "outdoor_l2_rate": 20.0,
+          "persuasion": 410,
+          "persuasion_share": 9.9,
+          "target_share": 10.6,
+          "targets": 840,
+          "town": "Bozrah",
+          "true_swing": 19,
+          "true_swing_rate": 2.3,
+          "veteran_l2": 19,
+          "weak_dem": 42
+        },
+        {
+          "age_50_plus": 498,
+          "age_50_plus_rate": 69.4,
+          "base_lean": 664,
+          "base_lean_rate": 92.5,
+          "business_l2": 16,
+          "early_vote": 226,
+          "early_vote_rate": 31.5,
+          "election_day": 398,
+          "election_day_rate": 55.4,
+          "outdoor_l2": 128,
+          "outdoor_l2_rate": 17.8,
+          "persuasion": 340,
+          "persuasion_share": 8.2,
+          "target_share": 9.0,
+          "targets": 718,
+          "town": "Franklin",
+          "true_swing": 17,
+          "true_swing_rate": 2.4,
+          "veteran_l2": 15,
+          "weak_dem": 37
+        }
+      ]
+    },
     "program_mix": [
       {
         "count": 3586,
@@ -310,7 +429,7 @@ window.TARGET_UNIVERSE = {
       "label": "L2/SOTS match ceiling"
     }
   ],
-  "generated_at": "2026-06-30T08:33:09",
+  "generated_at": "2026-06-30T08:45:22",
   "model": "HD48 2026 general-election likely-voter and target universe",
   "notes": [
     "Likely voters are turnout tiers Very High, High, and Medium.",

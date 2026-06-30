@@ -106,6 +106,14 @@ def age_band(row: dict[str, str]) -> str:
     return "80+"
 
 
+def signal_has(row: dict[str, str], *needles: str) -> bool:
+    text = " ".join(
+        row.get(key, "")
+        for key in ("expanded_l2_signal", "weak_context_signal", "l2_weak_feature_signal", "issue_political_signal")
+    ).lower()
+    return any(needle.lower() in text for needle in needles)
+
+
 def build_analysis(likely: list[dict[str, str]], targets: list[dict[str, str]],
                    persuasion: list[dict[str, str]], dem: list[dict[str, str]],
                    towns: list[dict[str, int | str | float]]) -> dict[str, object]:
@@ -118,12 +126,17 @@ def build_analysis(likely: list[dict[str, str]], targets: list[dict[str, str]],
     target_count = len(targets)
 
     town_type_counts: dict[str, Counter[str]] = {}
+    town_target_rows: dict[str, list[dict[str, str]]] = {}
     for row in targets:
-        town_type_counts.setdefault(row.get("town") or "Unspecified", Counter())[row.get("general_target_type") or "Unspecified"] += 1
+        town = row.get("town") or "Unspecified"
+        town_type_counts.setdefault(town, Counter())[row.get("general_target_type") or "Unspecified"] += 1
+        town_target_rows.setdefault(town, []).append(row)
     town_strategy = []
+    town_map = []
     for row in towns:
         town = str(row["town"])
         types = town_type_counts.get(town, Counter())
+        rows = town_target_rows.get(town, [])
         likely_count = int(row["likely"])
         town_targets = int(row["targets"])
         persuasion_count = int(row["persuasion"])
@@ -139,6 +152,34 @@ def build_analysis(likely: list[dict[str, str]], targets: list[dict[str, str]],
             "lean_support": types["Lean Support Persuasion/GOTV"],
             "true_swing": types["True Swing Persuasion"],
             "weak_dem": types["Weak Democrat Persuasion"],
+        })
+        outdoor = sum(1 for r in rows if signal_has(r, "shooting", "fishing", "hunting", "concealed-permit", "gun-owner"))
+        veteran = sum(1 for r in rows if signal_has(r, "veteran", "military"))
+        business = sum(1 for r in rows if signal_has(r, "business-owner", "Management/Business"))
+        election_day = sum(1 for r in rows if r.get("vote_method_tendency") == "Likely Election Day")
+        early_vote = sum(1 for r in rows if r.get("vote_method_tendency") == "Likely Early Vote")
+        age_50_plus = sum(1 for r in rows if age_band(r) in {"50-64", "65-79", "80+"})
+        town_map.append({
+            "town": town,
+            "targets": town_targets,
+            "target_share": pct(town_targets, target_count),
+            "persuasion": persuasion_count,
+            "persuasion_share": pct(persuasion_count, len(persuasion)),
+            "true_swing": types["True Swing Persuasion"],
+            "true_swing_rate": pct(types["True Swing Persuasion"], town_targets),
+            "base_lean": types["Base GOTV"] + types["Lean Support Persuasion/GOTV"],
+            "base_lean_rate": pct(types["Base GOTV"] + types["Lean Support Persuasion/GOTV"], town_targets),
+            "weak_dem": types["Weak Democrat Persuasion"],
+            "outdoor_l2": outdoor,
+            "outdoor_l2_rate": pct(outdoor, town_targets),
+            "veteran_l2": veteran,
+            "business_l2": business,
+            "election_day": election_day,
+            "election_day_rate": pct(election_day, town_targets),
+            "early_vote": early_vote,
+            "early_vote_rate": pct(early_vote, town_targets),
+            "age_50_plus": age_50_plus,
+            "age_50_plus_rate": pct(age_50_plus, town_targets),
         })
 
     segments = []
@@ -176,6 +217,16 @@ def build_analysis(likely: list[dict[str, str]], targets: list[dict[str, str]],
             {"label": "Weak Democrat Persuasion", "count": weak_d, "share": pct(weak_d, target_count), "role": "cross-pressured"},
         ],
         "town_strategy": town_strategy,
+        "map": {
+            "towns": town_map,
+            "metrics": [
+                {"key": "persuasion_share", "label": "Persuasion load", "suffix": "%"},
+                {"key": "true_swing_rate", "label": "True swing rate", "suffix": "%"},
+                {"key": "base_lean_rate", "label": "Base + lean protection", "suffix": "%"},
+                {"key": "outdoor_l2_rate", "label": "Outdoor / gun L2 texture", "suffix": "%"},
+                {"key": "election_day_rate", "label": "Election Day load", "suffix": "%"},
+            ],
+        },
         "consumer": {
             "age_bands": dict(Counter(age_band(row) for row in targets).most_common()),
             "vote_methods": count_by(targets, "vote_method_tendency"),
