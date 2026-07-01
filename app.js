@@ -113,8 +113,15 @@ ROUTES.geography = function (view) {
   const TOWNS_LIST = ["Colchester", "Lebanon", "Bozrah", "Franklin"];
   const PARTIES = [["R", "Republican"], ["D", "Democrat"], ["U", "Unaffiliated"], ["IT", "Independent"], ["L", "Libertarian"], ["G", "Green"], ["Worki", "Working Families"]];
   if (voterErr) {
-    view.innerHTML = vhead("Contact List", "var(--teal-lt)", "Data · Build a List", "Voter file not loaded") +
-      `<div class="note info" style="max-width:74ch;"><div><b>The contact-list builder runs where the voter file is present.</b><br><br>To keep individual voter records — names, home addresses, state voter IDs — off the public web, the Likely 2026 Voter file is not bundled in this public build. Open the dashboard locally (or on a private / password-gated host) with <code>exports/hd48_2026_likely_voter_universe.csv</code> in place to search, filter, and export contact lists (First Name · Last Name · State Voter ID · Address No. · Street Name · Party).</div></div>`;
+    view.innerHTML = vhead("Contact List", "var(--teal-lt)", "Data · Build a List", "Load the voter file") +
+      `<div class="vcard" style="padding:28px 26px;max-width:76ch;">
+        <div class="rlabel" style="margin-bottom:10px;">Load Voter File</div>
+        <div style="font-family:var(--ff-body);font-size:13.5px;color:var(--fg-muted);line-height:1.55;margin-bottom:18px;">The voter file is not bundled in the public build (individual records stay off the public web). Load <code>hd48_2026_likely_voter_universe.csv</code> from this device to build lists — it is read in your browser and never uploaded.</div>
+        <label class="btn pri" style="display:inline-flex;align-items:center;gap:10px;padding:12px 20px;font-size:12px;letter-spacing:1.5px;border-radius:6px;cursor:pointer;">Choose voter CSV<input id="d-file" type="file" accept=".csv" style="display:none;"></label>
+        <div style="font-family:var(--ff-body);font-size:11px;color:var(--fg-dim);margin-top:14px;">Export columns: First Name · Last Name · State Voter ID · Address No. · Street Name · Party.</div>
+      </div>`;
+    const fi = view.querySelector("#d-file");
+    if (fi) fi.onchange = e => { const f = e.target.files[0]; if (!f) return; const rd = new FileReader(); rd.onload = () => { try { voterRows = parseVoterCSV(String(rd.result)); voterErr = null; route(); } catch (err) { voterErr = "parse error"; route(); } }; rd.readAsText(f); };
     return;
   }
   if (!voterRows) {
@@ -942,23 +949,36 @@ function analysisMap(id, rows, metric, selTown) {
 }
 
 /* ───────────────── TARGETS · LIKELY 2026 VOTER ───────────────── */
-let targetSel = null;
-let tuApplyStyles = null;
+let targetSel = null, targetMetric = "R", tuApplyStyles = null;
+const TGT_METRICS = [
+  { key: "R", label: "R Targets", get: t => t.R, rgb: [207, 65, 51], hex: "#F06A5A", note: "Republican targets by town" },
+  { key: "U", label: "U Targets", get: t => t.U, rgb: [139, 92, 246], hex: "#A78BFA", note: "Unaffiliated targets by town" },
+  { key: "D", label: "D Targets", get: t => t.D, rgb: [59, 130, 246], hex: "#60A5FA", note: "Democratic crossover targets by town" },
+  { key: "lift", label: "Turnout Lift", get: t => t.lift, rgb: [212, 160, 23], hex: "#F0B82A", note: "R turnout-lift pool by town" },
+];
+function tgtRecs() {
+  return (TARGET && TARGET.towns ? TARGET.towns : []).map(t => {
+    const bp = t.tgt_by_party || { R: 0, U: 0, D: 0 };
+    const regR = TOWNS[t.town] ? TOWNS[t.town].party.Republican : 0;
+    return { name: t.town, likely: t.likely, target_rate: t.target_rate, reg: TOWNS[t.town] ? TOWNS[t.town].active : 0,
+      R: bp.R, U: bp.U, D: bp.D, lift: Math.max(0, regR - bp.R) };
+  });
+}
 function selectTargetTown(name) { targetSel = name; if (tuApplyStyles) tuApplyStyles(); paintTargetSel(); }
 function paintTargetSel() {
-  const host = document.getElementById("tu-sel"); if (!host || !TARGET) return;
-  const t = (TARGET.towns || []).find(x => x.town === targetSel); if (!t) return;
-  const likely = TARGET.summary.likely_voters || 1;
-  const reg = TOWNS[t.town] ? TOWNS[t.town].active : 0;
+  const host = document.getElementById("tu-sel"); if (!host) return;
+  const r = tgtRecs().find(x => x.name === targetSel); if (!r) return;
+  const row = (k, v, c) => `<div class="dpanel-row"><span class="k">${k}</span><span class="r-num" style="font-size:15px;color:${c};">${v}</span></div>`;
   host.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-      <span class="r-num" style="font-size:24px;color:var(--fg);">${t.town}</span>
-      <span class="rlabel" style="color:var(--teal-lt);">${pc1(100 * t.likely / likely)} of universe</span>
+      <span class="r-num" style="font-size:24px;color:var(--fg);">${r.name}</span>
+      <span class="rlabel" style="color:var(--teal-lt);">${fmt(r.likely)} likely</span>
     </div>
-    <div class="dpanel-row"><span class="k">Likely 2026 Voter</span><span class="r-num" style="font-size:15px;color:var(--teal-lt);">${fmt(t.likely)}</span></div>
-    <div class="dpanel-row"><span class="k">Active registration</span><span class="r-num" style="font-size:15px;color:var(--fg);">${fmt(reg)}</span></div>
-    <div class="dpanel-row"><span class="k">Modeled target rate</span><span class="r-num" style="font-size:15px;color:var(--gold-lt);">${pc1(t.target_rate)}</span></div>
-    <div class="dpanel-row"><span class="k">Likely ÷ active</span><span class="r-num" style="font-size:15px;color:var(--fg);">${pc1(100 * t.likely / (reg || 1))}</span></div>`;
+    ${row("R Targets", fmt(r.R), "#F06A5A")}
+    ${row("U Targets", fmt(r.U), "#A78BFA")}
+    ${row("D Targets", fmt(r.D), "#60A5FA")}
+    ${row("Turnout Lift", fmt(r.lift), "#F0B82A")}
+    ${row("Active reg.", fmt(r.reg), "var(--fg)")}`;
 }
 ROUTES.targets = function (view) {
   if (!TARGET) {
@@ -970,23 +990,26 @@ ROUTES.targets = function (view) {
   const likely = s.likely_voters;
   const win = TARGET.win_number, plan = TARGET.planning_turnout;
   const cleared = myVotes - win;
-  const recs = (TARGET.towns || []).map(t => ({ name: t.town, likely: t.likely, target_rate: t.target_rate, reg: TOWNS[t.town] ? TOWNS[t.town].active : 0 }));
+  const recs = tgtRecs();
   const byName = Object.fromEntries(recs.map(r => [r.name, r]));
   if (!byName[targetSel]) targetSel = recs.slice().sort((a, b) => b.likely - a.likely)[0] ? recs.slice().sort((a, b) => b.likely - a.likely)[0].name : null;
-  const ranked = recs.slice().sort((a, b) => b.likely - a.likely);
-  const lmax = Math.max(...ranked.map(t => t.likely), 1);
-  // Turnout Lift: active registered Republicans outside the Likely-Voter universe
+  if (!TGT_METRICS.some(m => m.key === targetMetric)) targetMetric = "R";
+  const M = TGT_METRICS.find(m => m.key === targetMetric);
+  const ranked = recs.slice().sort((a, b) => M.get(b) - M.get(a));
+  const mmax = Math.max(...ranked.map(t => M.get(t)), 1);
+  // Turnout Lift district total: active registered Republicans outside the Likely-Voter universe
   const lift = Math.max(0, (T.party.Republican || 0) - (s.parties.R || 0));
 
   const kpi = (lab, val, sub, accent, valcol) => `<div class="stat" style="--accent:${accent};"><div class="sl">${lab}</div><div class="sv" style="color:${valcol || "var(--fg)"};">${val}</div><div class="ss">${sub}</div></div>`;
   const crit = (col, items) => items.map(c => `<div style="display:flex;align-items:flex-start;gap:11px;padding:11px 0;border-bottom:1px solid var(--hairline);">
       <span style="color:${col};font-size:14px;flex-shrink:0;line-height:1.3;">✓</span>
       <span style="font-family:var(--ff-body);font-size:13.5px;color:var(--fg);line-height:1.45;">${c}</span></div>`).join("");
+  const metricBtns = TGT_METRICS.map(m => `<button class="seg-btn ${m.key === targetMetric ? "on" : ""}" data-tmetric="${m.key}">${m.label}</button>`).join("");
   const rankRows = ranked.map((t, i) => `<div class="prow" data-ttown="${t.name}" role="button" tabindex="0" style="${t.name === targetSel ? "background:rgba(34,170,188,.12);border-color:rgba(34,170,188,.35);" : ""}">
       <span class="r-num" style="font-size:12px;color:var(--fg-muted);width:18px;">${String(i + 1).padStart(2, "0")}</span>
       <div style="flex:1;min-width:0;">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;"><span class="r-num" style="font-size:15px;color:var(--fg);">${t.name}</span><span class="r-num" style="font-size:14px;color:var(--teal-lt);">${fmt(t.likely)}</span></div>
-        <div style="height:5px;border-radius:3px;background:rgba(255,255,255,.06);overflow:hidden;"><div style="height:100%;width:${100 * t.likely / lmax}%;background:var(--teal-lt);border-radius:3px;"></div></div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;"><span class="r-num" style="font-size:15px;color:var(--fg);">${t.name}</span><span class="r-num" style="font-size:14px;color:${M.hex};">${fmt(M.get(t))}</span></div>
+        <div style="height:5px;border-radius:3px;background:rgba(255,255,255,.06);overflow:hidden;"><div style="height:100%;width:${100 * M.get(t) / mmax}%;background:${M.hex};border-radius:3px;"></div></div>
       </div></div>`).join("");
 
   view.innerHTML =
@@ -999,15 +1022,16 @@ ROUTES.targets = function (view) {
     </div>
 
     <div class="console-card" style="margin-bottom:16px;">
-      <div class="console-head"><span class="rlabel">District Map · Likely 2026 Voter</span><span class="rlabel" style="color:var(--fg-dim);">${recs.length} towns · ${fmt(likely)} total · click to inspect</span></div>
+      <div class="console-head"><span class="rlabel">District Map · <span style="color:${M.hex};">${M.label}</span></span><div class="seg">${metricBtns}</div></div>
       <div class="console-body" style="display:grid;grid-template-columns:1.6fr 1fr;">
         <div class="amap-wrap" style="position:relative;border-right:1px solid var(--border);">
-          <div id="tu-map" style="height:520px;border:0;border-radius:0;background:#0C1A2E;"></div>
+          <div id="tu-map" style="height:560px;border:0;border-radius:0;background:#0B1A2E;"></div>
+          <div id="tu-legend" class="amap-legend"></div>
         </div>
         <div style="padding:18px;">
           <div id="tu-sel" style="background:rgba(15,33,64,.6);border:1px solid var(--border-strong);border-radius:8px;padding:16px 18px;margin-bottom:16px;"></div>
           <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;">
-            <span class="rlabel">Town Rank</span><span class="rlabel" style="color:var(--teal-lt);">Likely 2026 Voter</span>
+            <span class="rlabel">Town Rank</span><span class="rlabel" style="color:${M.hex};">${M.label}</span>
           </div>
           <div style="display:flex;flex-direction:column;gap:4px;">${rankRows}</div>
         </div>
@@ -1051,25 +1075,32 @@ ROUTES.targets = function (view) {
     <div class="vbanner" style="margin-top:16px;"><span class="tag" style="font-size:10px;color:var(--gold);">Model</span><span class="kicker" style="text-transform:none;letter-spacing:0;font-family:var(--ff-body);font-size:10.5px;">Likely 2026 Voter is the planning universe. Turnout Lift is a separate GOTV pool and is not part of it.</span></div>`;
 
   paintTargetSel();
+  view.querySelectorAll("[data-tmetric]").forEach(b => b.onclick = () => { targetMetric = b.dataset.tmetric; route(); });
   view.querySelectorAll("[data-ttown]").forEach(eln => {
     const go = () => selectTargetTown(eln.dataset.ttown);
     eln.onclick = go;
     eln.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } };
   });
-  setTimeout(() => targetUnivMap(recs, byName), 30);
+  setTimeout(() => targetUnivMap(recs, byName, M), 30);
 };
 
-/* Likely 2026 Voter district map — towns shaded by likely-voter count, click to inspect */
-function targetUnivMap(recs, byName) {
+/* ramp deep-navy → metric hue by value */
+function rampTo(v, min, max, rgb) {
+  const t = max > min ? (v - min) / (max - min) : .5;
+  const lo = [18, 34, 52];
+  return `rgb(${lo.map((c, i) => Math.round(c + (rgb[i] - c) * (0.26 + .74 * t))).join(",")})`;
+}
+/* district map — towns shaded by the selected target metric, click to inspect */
+function targetUnivMap(recs, byName, M) {
   const host = document.getElementById("tu-map");
   if (!host || !GEO || !GEO.towns) return;
-  const vals = recs.map(r => r.likely), lo = Math.min(...vals), hi = Math.max(...vals);
+  const vals = recs.map(r => M.get(r)), lo = Math.min(...vals), hi = Math.max(...vals);
   const map = L.map("tu-map", { scrollWheelZoom: false, zoomControl: false, attributionControl: false,
     dragging: false, doubleClickZoom: false, boxZoom: false, keyboard: false, touchZoom: false });
   const byLayer = {};
   const styleFor = name => { const r = byName[name]; const sel = name === targetSel;
-    return { fillColor: r ? regColor(r.likely, lo, hi) : "#25313f", fillOpacity: .95,
-      color: sel ? "#F0B82A" : "rgba(255,255,255,.16)", weight: sel ? 2.5 : 1 }; };
+    return { fillColor: r ? rampTo(M.get(r), lo, hi, M.rgb) : "#25313f", fillOpacity: .92,
+      color: sel ? "#F0B82A" : "rgba(255,255,255,.14)", weight: sel ? 2.5 : 1 }; };
   const applyOne = name => { if (byLayer[name]) byLayer[name].setStyle(styleFor(name)); };
   tuApplyStyles = () => Object.keys(byLayer).forEach(applyOne);
   const layer = L.geoJSON(GEO.towns, {
@@ -1079,19 +1110,23 @@ function targetUnivMap(recs, byName) {
       byLayer[name] = lyr;
       lyr.on({
         click: () => selectTargetTown(name),
-        mouseover: e => { if (name !== targetSel) e.target.setStyle({ color: "rgba(255,255,255,.5)", weight: 1.5 }); },
+        mouseover: e => { if (name !== targetSel) e.target.setStyle({ color: "rgba(255,255,255,.55)", weight: 1.5 }); },
         mouseout: () => applyOne(name),
       });
     }
   }).addTo(map);
-  map.fitBounds(layer.getBounds(), { padding: [40, 40] });
+  map.fitBounds(layer.getBounds(), { padding: [46, 46] });
   (window._maps = window._maps || []).push(map);
+  const lg = document.getElementById("tu-legend");
+  if (lg) lg.innerHTML = `<div class="rlabel" style="margin-bottom:8px;color:${M.hex};">${M.label}</div>
+    <div style="width:150px;height:10px;border-radius:3px;background:linear-gradient(90deg,${rampTo(lo, lo, hi, M.rgb)},${rampTo(hi, lo, hi, M.rgb)});"></div>
+    <div style="display:flex;justify-content:space-between;margin-top:5px;"><span class="r-num" style="font-size:10px;color:var(--fg-muted);">${fmt(lo)}</span><span class="r-num" style="font-size:10px;color:var(--fg-muted);">${fmt(hi)}</span></div>`;
   GEO.towns.features.forEach(f => {
     const name = f.properties.town, r = byName[name]; if (!byLayer[name] || !r) return;
     const c = byLayer[name].getBounds().getCenter();
     L.tooltip({ permanent: true, direction: "center", className: "v-town-lbl", opacity: 1 })
       .setLatLng(c)
-      .setContent(`<div style="text-align:center;pointer-events:none;text-shadow:0 2px 10px rgba(0,0,0,.7)"><div style="font-family:var(--ff-display);font-weight:800;font-size:17px;letter-spacing:1px;text-transform:uppercase;color:#fff;line-height:1">${name}</div><div style="font-family:var(--ff-cond);font-weight:700;font-size:15px;color:rgba(255,255,255,.9);margin-top:3px;font-variant-numeric:tabular-nums">${fmt(r.likely)}</div></div>`)
+      .setContent(`<div style="text-align:center;pointer-events:none;text-shadow:0 2px 10px rgba(0,0,0,.7)"><div style="font-family:var(--ff-display);font-weight:800;font-size:17px;letter-spacing:1px;text-transform:uppercase;color:#fff;line-height:1">${name}</div><div style="font-family:var(--ff-cond);font-weight:700;font-size:15px;color:rgba(255,255,255,.92);margin-top:3px;font-variant-numeric:tabular-nums">${fmt(M.get(r))}</div></div>`)
       .addTo(map);
   });
 }
