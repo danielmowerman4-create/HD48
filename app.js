@@ -1073,7 +1073,7 @@ ROUTES.targets = function (view) {
         <div>${critRow("Voted 4 of 4 or 3 of 4 last general elections", F.g43)}${critRow("Voted the last 2 of 2 general elections", F.last22)}</div>
         <div>${critRow("Voted 2 of 3 last general elections", F.of23)}${critRow("New mover (past 3 years) — voted at least once", F.newmover)}</div>
       </div>
-      <div style="font-family:var(--ff-body);font-size:11px;color:var(--fg-dim);margin-top:12px;line-height:1.5;">Counts computed per voter from vote history in the SOTS/L2 file; ${fmt(F.g43 + F.last22 + F.of23 + F.newmover)} total, every member accounted for.</div>
+      <div style="font-family:var(--ff-body);font-size:11px;color:var(--fg-dim);margin-top:12px;line-height:1.5;">Counts computed per voter from SOTS vote history; ${fmt(F.g43 + F.last22 + F.of23 + F.newmover)} total, every member accounted for. Excludes voters registered 10+ years who have never voted in a midterm.</div>
     </div>
 
     <div class="vcard" style="padding:0;overflow:hidden;margin-top:16px;border-color:rgba(207,65,51,.35);">
