@@ -377,63 +377,83 @@ function colorForMargin(m) { // m = D − R, two-party points
   if (m > 15) return "#1A3A8C"; if (m > 5) return "#3A6AB8"; if (m > -5) return "#5A6E80"; if (m > -15) return "#E05555"; return "#CC2222";
 }
 ROUTES.results = function (view) {
-  if (!RES) { view.appendChild(el("div", "note", "<div>Results data not loaded.</div>")); return; }
+  if (!RES) { view.innerHTML = vhead("Certified Returns", "var(--teal-lt)", "Results", "") + `<div class="note"><div>Results data not loaded.</div></div>`; return; }
   if (!RES.races[resRace]) resRace = RES.order[0];
-  view.insertAdjacentHTML("beforeend", vhead("Certified Returns", "var(--teal-lt)", "Results", RES.note || "CT SOTS"));
-
-  // race selector
-  const seg = el("div", "seg"); seg.style.marginBottom = "18px";
-  seg.innerHTML = RES.order.map(k => `<button class="seg-btn ${k === resRace ? "on" : ""}" data-k="${k}">${RES.races[k].label}</button>`).join("");
-  seg.querySelectorAll("button").forEach(b => b.onclick = () => { resRace = b.dataset.k; route(); });
-  view.appendChild(seg);
-
   const race = RES.races[resRace];
   const tot = resTotals(race);
   const prev = RES.compare[resRace] ? RES.races[RES.compare[resRace]] : null;
   const prevTot = prev ? resTotals(prev) : null;
   const win = tot.r >= tot.d ? "r" : "d";
   const winName = win === "r" ? race.rep.name : race.dem.name;
-  const swingTxt = prevTot ? (() => { const dm = tot.margin - prevTot.margin; return `${dm >= 0 ? "D" : "R"}+${Math.abs(dm).toFixed(1)} vs ${prev.year}`; })() : "—";
+  const winColor = win === "r" ? "var(--rep-lt)" : "var(--dem-lt)";
+  const winBg = win === "r" ? "rgba(220,38,38,.12)" : "rgba(37,99,235,.14)";
+  const winBorder = win === "r" ? "rgba(220,38,38,.4)" : "rgba(37,99,235,.4)";
+  const swingTxt = prevTot ? (() => { const dm = tot.margin - prevTot.margin; return `swing ${dm >= 0 ? "D" : "R"}+${Math.abs(dm).toFixed(1)} vs ${prev.year}`; })() : "first comparable cycle";
 
-  // summary strip
-  const sum = el("div", "rsum");
-  sum.innerHTML =
-    `<div><div class="lab">${race.office}</div><div class="win-pill ${win}">${winName} ✓</div><div class="sub">${race.scope}</div></div>
-     <div><div class="lab">${race.rep.name.split(" ").pop()} (R)</div><div class="val r">${fmt(tot.r)}</div><div class="sub">${pc1(tot.rPct)}</div></div>
-     <div><div class="lab">${race.dem.name.split(" ").pop()} (D)</div><div class="val d">${fmt(tot.d)}</div><div class="sub">${pc1(tot.dPct)}</div></div>
-     <div><div class="lab">Margin</div><div class="val ${win}">${marginLabel(tot.margin)}</div><div class="sub">swing ${swingTxt}</div></div>`;
-  view.appendChild(sum);
+  // race selector — grouped by office so it scales as races are added
+  const groups = {};
+  RES.order.forEach(k => { const o = RES.races[k].office; (groups[o] = groups[o] || []).push(k); });
+  const raceSel = Object.entries(groups).map(([office, keys]) =>
+    `<div class="seg">${keys.map(k => `<button class="seg-btn ${k === resRace ? "on" : ""}" data-k="${k}">${RES.races[k].label}</button>`).join("")}</div>`).join("");
 
-  const g = C.gen_years || {};
-  const years = [2018, 2020, 2022, 2024];
+  // turnout history
+  const g = C.gen_years || {}; const years = [2018, 2020, 2022, 2024];
   const maxTurnout = Math.max(...years.map(y => g[y] || 0)) || 1;
-  const turnoutRows = years.map(y => {
-    const v = g[y] || 0;
-    const mid = y === 2018 || y === 2022;
-    return `<div style="background:var(--navy-card);padding:13px 16px;">
-      <div class="h-card">${y} ${mid ? "Midterm" : "Presidential"}</div>
-      <div class="num" style="font-size:25px;margin-top:4px;color:${mid ? "var(--gold-lt)" : "var(--teal-lt)"};">${fmt(v)}</div>
-      <div class="scorebar"><i style="width:${Math.round(100 * v / maxTurnout)}%;background:${mid ? "var(--gold)" : "var(--teal)"};"></i></div>
+  const turnoutCards = years.map(y => {
+    const v = g[y] || 0, mid = y % 4 !== 0;
+    const c = mid ? "var(--gold-lt)" : "var(--teal-lt)", bar = mid ? "var(--gold)" : "var(--teal)";
+    return `<div style="background:var(--navy-card);padding:16px 18px;">
+      <div class="rlabel">${y} ${mid ? "Midterm" : "Presidential"}</div>
+      <div class="r-num" style="font-size:28px;margin:8px 0 12px;color:${c};">${fmt(v)}</div>
+      <div style="height:6px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden;"><div style="height:100%;width:${Math.round(100 * v / maxTurnout)}%;background:${bar};border-radius:3px;"></div></div>
     </div>`;
   }).join("");
-  const turnout = el("div");
-  turnout.innerHTML = `<div class="metric-grid">${turnoutRows}</div>`;
-  view.appendChild(turnout);
 
-  // map + town results
-  const row = el("div", "vrow"); row.style.gridTemplateColumns = "1.5fr 1fr"; row.style.marginTop = "22px"; row.style.alignItems = "start";
-  const mapCard = el("div", "card pad");
-  mapCard.appendChild(el("p", "section-title", "Margin by town<span class='ln'></span>"));
-  const md = el("div"); md.id = "rmap"; mapCard.appendChild(md);
-  const lg = el("div", "legend"); lg.id = "rmap-legend"; lg.style.marginTop = "10px"; mapCard.appendChild(lg);
-  row.appendChild(mapCard);
+  // town result + swing rows
+  const townRows = RES.towns.map(tn => {
+    const t = race.towns[tn]; const two = t.d + t.r; const mm = 100 * (t.d - t.r) / two;
+    const mc = mm >= 0 ? "var(--dem-lt)" : "var(--rep-lt)";
+    let sw = "";
+    if (prev && prev.towns[tn]) { const p = prev.towns[tn]; const pm = 100 * (p.d - p.r) / (p.d + p.r); const dm = mm - pm;
+      sw = `<span class="r-num" style="font-size:12px;color:${dm >= 0 ? "var(--dem-lt)" : "var(--rep-lt)"};">${dm >= 0 ? "▲ D" : "▼ R"}+${Math.abs(dm).toFixed(1)}</span>`; }
+    return `<div style="border:1px solid var(--border);background:rgba(15,26,44,.4);border-radius:8px;padding:13px 14px;margin-bottom:10px;">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:9px;"><span class="r-num" style="font-size:16px;color:var(--fg);">${tn}</span><span style="display:flex;align-items:baseline;gap:10px;"><span class="r-num" style="font-size:14px;color:${mc};">${marginLabel(mm)}</span>${sw}</span></div>
+      <div style="display:flex;height:26px;border-radius:4px;overflow:hidden;"><div style="width:${100 * t.d / two}%;background:var(--bar-d);display:flex;align-items:center;padding-left:10px;min-width:0;"><span class="r-num" style="font-size:12px;color:#fff;">${fmt(t.d)}</span></div><div style="width:${100 * t.r / two}%;background:var(--bar-r);display:flex;align-items:center;justify-content:flex-end;padding-right:10px;min-width:0;"><span class="r-num" style="font-size:12px;color:#fff;">${fmt(t.r)}</span></div></div>
+    </div>`;
+  }).join("");
 
-  const side = el("div", "card pad");
-  side.appendChild(el("p", "section-title", (prev ? "Town result & swing" : "Town result") + "<span class='ln'></span>"));
-  side.appendChild(townResultRows(race, prev));
-  row.appendChild(side);
-  view.appendChild(row);
+  view.innerHTML =
+    vhead("Certified Returns", "var(--teal-lt)", "Results", RES.note || "CT SOTS") +
+    `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">${raceSel}</div>
 
+    <div class="vcard" style="padding:22px 26px;margin-bottom:16px;">
+      <div class="rsum-grid" style="display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr;gap:24px;align-items:center;">
+        <div>
+          <div class="rlabel" style="margin-bottom:12px;">${race.office}</div>
+          <div style="display:inline-flex;align-items:center;gap:8px;background:${winBg};border:1px solid ${winBorder};border-radius:4px;padding:9px 14px;"><span class="r-num" style="font-size:15px;letter-spacing:1px;text-transform:uppercase;color:${winColor};">${winName}</span><span style="color:${winColor};">✓</span></div>
+          <div style="font-family:var(--ff-body);font-size:12px;color:var(--fg-muted);margin-top:10px;">${race.scope}</div>
+        </div>
+        <div><div class="rlabel" style="color:var(--rep-lt);">${race.rep.name.split(" ").pop()} (R)</div><div class="r-num" style="font-size:34px;line-height:1;color:var(--rep-lt);margin-top:6px;">${fmt(tot.r)}</div><div style="font-family:var(--ff-body);font-size:12px;color:var(--fg-muted);margin-top:6px;">${pc1(tot.rPct)}</div></div>
+        <div><div class="rlabel" style="color:var(--dem-lt);">${race.dem.name.split(" ").pop()} (D)</div><div class="r-num" style="font-size:34px;line-height:1;color:var(--dem-lt);margin-top:6px;">${fmt(tot.d)}</div><div style="font-family:var(--ff-body);font-size:12px;color:var(--fg-muted);margin-top:6px;">${pc1(tot.dPct)}</div></div>
+        <div><div class="rlabel">Margin</div><div class="r-num" style="font-size:34px;line-height:1;color:${winColor};margin-top:6px;">${marginLabel(tot.margin)}</div><div style="font-family:var(--ff-body);font-size:12px;color:var(--fg-muted);margin-top:6px;">${swingTxt}</div></div>
+      </div>
+    </div>
+
+    <div class="wpanel cols-4" style="grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px;">${turnoutCards}</div>
+
+    <div class="wpanel" style="grid-template-columns:1.55fr 1fr;gap:16px;align-items:start;">
+      <div class="console-card">
+        <div style="padding:14px 18px 12px;"><span class="rlabel">Margin by Town</span></div>
+        <div id="rmap" style="height:500px;border:0;border-radius:0;"></div>
+        <div class="legend" id="rmap-legend" style="padding:14px 18px;border-top:1px solid var(--border);"></div>
+      </div>
+      <div class="vcard" style="padding:18px;">
+        <div class="rlabel" style="margin-bottom:14px;">Town Result &amp; Swing</div>
+        ${townRows}
+      </div>
+    </div>`;
+
+  view.querySelectorAll("[data-k]").forEach(b => b.onclick = () => { resRace = b.dataset.k; route(); });
   setTimeout(() => resultsMap("rmap", race, "rmap-legend"), 30);
 };
 function townResultRows(race, prev) {
@@ -1211,25 +1231,28 @@ ROUTES.geography = function (view) {
   const list = geoMode === "town"
     ? towns.map(t => ({ name: t.name, v: m.get(t), sub: fmt(t.active) + " act", col: m.color(m.get(t)), kind: "town", obj: t }))
     : precs.map(p => ({ name: p.name, v: m.get(p), sub: fmt(p.active) + " act", col: m.color(m.get(p)), kind: "precinct", obj: p }));
-  const listRows = list.map((r, i) => `<div class="prow" data-i="${i}" role="button" tabindex="0"><span style="width:12px;height:12px;border-radius:3px;background:${r.col};flex-shrink:0;"></span>
-    <span class="num" style="font-size:15px;flex:1;">${r.name}</span><span class="num" style="color:var(--gold-lt);">${m.fmt(r.v)}</span>
-    <span class="kicker" style="width:56px;text-align:right;">${r.sub}</span></div>`).join("");
+  const rankRows = list.map((r, i) => `<div class="prow" data-i="${i}" role="button" tabindex="0" style="padding:13px 12px;">
+    <span style="width:12px;height:12px;border-radius:3px;background:${r.col};flex-shrink:0;"></span>
+    <span class="r-num" style="font-size:16px;flex:1;min-width:0;color:var(--fg);">${r.name}</span>
+    <span class="r-num" style="font-size:15px;color:var(--gold-lt);">${m.fmt(r.v)}</span>
+    <span class="rlabel" style="width:74px;text-align:right;">${r.sub}</span></div>`).join("");
 
   view.innerHTML =
     vhead("Geographic Breakdown · Recolor By Metric", "var(--teal-lt)", "Town & Precinct", "Click any area to drill in") +
-    `<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:18px;">
+    `<div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center;margin-bottom:16px;">
        <div class="seg">${seg}</div>
-       <span class="kicker">Map by</span><div class="seg">${modeSeg}</div>
+       <div style="display:flex;align-items:center;gap:10px;"><span class="rlabel">Map by</span><div class="seg">${modeSeg}</div></div>
      </div>
-    <div class="vrow" style="grid-template-columns:1.6fr 1fr;">
-      <div class="vcard" style="padding:18px 20px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><span class="h-card">District Map · ${m.label}</span><span class="kicker" style="color:var(--fg-dim);">${geoMode === "town" ? towns.length + " towns" : precs.length + " precincts"}</span></div>
-        <div id="gmap"></div><div class="legend" id="gmap-legend" style="margin-top:10px;"></div>
-        ${geoMode === "precinct" ? `<div class="kicker" style="font-size:9px;margin-top:7px;color:var(--fg-dim);">Bubble size = active voters · placed within town (state publishes no precinct shapes)</div>` : ""}
+    <div class="wpanel" style="grid-template-columns:1.7fr 1fr;gap:16px;align-items:start;">
+      <div class="console-card">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;padding:14px 18px 12px;"><span class="rlabel">District Map · ${m.label}</span><span class="rlabel">${geoMode === "town" ? towns.length + " towns" : precs.length + " precincts"}</span></div>
+        <div id="gmap" style="height:520px;border:0;border-radius:0;"></div>
+        <div class="legend" id="gmap-legend" style="padding:14px 18px;border-top:1px solid var(--border);"></div>
+        ${geoMode === "precinct" ? `<div class="rlabel" style="font-size:9px;padding:0 18px 12px;color:var(--fg-dim);text-transform:none;letter-spacing:0;font-family:var(--ff-body);">Bubble size = active voters · placed within town (state publishes no precinct shapes)</div>` : ""}
       </div>
-      <div class="vcard" style="padding:18px 20px;">
-        <div class="h-card" style="margin-bottom:12px;">${geoMode === "town" ? "Towns" : "Precincts"} · ${m.label}</div>
-        <div style="display:flex;flex-direction:column;gap:6px;">${listRows}</div>
+      <div class="vcard" style="padding:18px;">
+        <div class="rlabel" style="margin-bottom:12px;">${geoMode === "town" ? "Town" : "Precinct"} Rank · ${m.label}</div>
+        <div style="display:flex;flex-direction:column;gap:4px;">${rankRows}</div>
       </div>
     </div>`;
 
