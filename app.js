@@ -15,6 +15,11 @@ const root = document.documentElement.style;
 root.setProperty("--camp", "#CF4133");   // primary campaign identity = Republican red (brand accent)
 root.setProperty("--camp-lt", "#F06A5A"); // lighter campaign red for text / gradients on dark
 root.setProperty("--camp-deep", "#7E2A22");
+// program semantics used site-wide: BASE = red, PERSUASION = purple
+root.setProperty("--base", "#CF4133");
+root.setProperty("--base-lt", "#F06A5A");
+root.setProperty("--persuasion", "#8B5CF6");
+root.setProperty("--persuasion-lt", "#A78BFA");
 document.title = C.headline + " · DM Strategies";
 document.getElementById("h-title").innerHTML = "<b>" + C.headline + "</b>";
 document.getElementById("b-gen").textContent = "Updated " + C.generated_at.replace("T", " · ").slice(0, 21);
@@ -531,7 +536,7 @@ function renderRail(active) {
   if (!rail) return;
   const s = standings();
   const ctx = RAIL_CTX[active] || RAIL_CTX.verdict;
-  const segs = [["var(--teal)", s.pBase], ["var(--gold)", s.pPersu], ["var(--npa)", s.pReg]]
+  const segs = [["var(--base)", s.pBase], ["var(--persuasion)", s.pPersu], ["var(--npa)", s.pReg]]
     .map(([c, w]) => `<span style="flex:${Math.max(3, w)};background:${c};"></span>`).join("");
   rail.innerHTML = `
     <div class="rk">${C.posture === "defense" ? "2026 Defense" : "2026 Pickup"}</div>
@@ -565,6 +570,12 @@ function vLabel(m) { return m > 15 ? "Safe D" : m > 5 ? "Lean D" : m > -5 ? "Tos
 function vTone(m)  { return m > 5 ? { txt: "#60A5FA", tint: "rgba(37,99,235,.15)", bd: "rgba(96,165,250,.35)" }
   : m > -5 ? { txt: "#AEB9C6", tint: "rgba(148,163,184,.13)", bd: "rgba(148,163,184,.32)" }
   : { txt: "#F87171", tint: "rgba(220,38,38,.14)", bd: "rgba(248,113,113,.35)" }; }
+/* front-map fill: registration magnitude, deep slate → teal (non-partisan) */
+function regColor(reg, min, max) {
+  const t = max > min ? (reg - min) / (max - min) : .5;
+  const lo = [23, 42, 60], hi = [47, 182, 200];
+  return `rgb(${lo.map((c, i) => Math.round(c + (hi[i] - c) * (0.30 + .70 * t))).join(",")})`;
+}
 let verdictSel = null;
 
 ROUTES.verdict = function (view) {
@@ -590,6 +601,7 @@ ROUTES.verdict = function (view) {
   const byName = Object.fromEntries(recs.map(r => [r.name, r]));
   const targetN = recs.filter(r => r.target).length;
   if (!byName[verdictSel]) verdictSel = (recs.find(r => r.target) || recs[0] || {}).name;
+  const regs = recs.map(r => r.reg); const rMin = Math.min(...regs), rMax = Math.max(...regs);
 
   // turnout sparkline (real general-election ballots)
   const g = C.gen_years || {}; const yrs = [2018, 2020, 2022, 2024]; const gv = yrs.map(y => g[y] || 0);
@@ -616,36 +628,35 @@ ROUTES.verdict = function (view) {
     <div style="font-family:var(--ff-body);font-size:11px;color:var(--fg-muted)">${sub}</div></div>`;
 
   view.innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 336px;gap:20px;align-items:stretch">
+    <div style="display:grid;grid-template-columns:1fr 336px;gap:20px;align-items:start">
       <!-- CENTER: KPIs + district map -->
       <section style="display:flex;flex-direction:column;min-width:0">
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
           ${kpi("01", "Margin", fmt(dec), "", "2024 decisive votes · protect the edge", "var(--camp-lt)")}
           ${kpi("02", "Map", concShare, "%", `turf in ${k} town${k > 1 ? "s" : ""} · concentrate`, "var(--teal-lt)")}
-          ${kpi("03", "Targets", fmt(persu), "", "persuasion voters · win the swing", "var(--gold)", "var(--gold-lt)")}
+          ${kpi("03", "Targets", fmt(persu), "", "persuasion voters · win the swing", "var(--persuasion)", "var(--persuasion-lt)")}
         </div>
 
-        <div style="display:flex;align-items:flex-end;justify-content:space-between;padding:20px 2px 10px">
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;padding:20px 2px 12px">
           <div>
-            <div style="font-family:var(--ff-cond);font-weight:600;font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:var(--fg-muted)">District Map · Town Margins</div>
+            <div style="font-family:var(--ff-cond);font-weight:600;font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:var(--fg-muted)">District Map · Active Registration</div>
             <div style="font-family:var(--ff-body);font-size:11px;color:var(--fg-dim);margin-top:3px">${C.district_label} · ${recs.length} towns · click to inspect</div>
           </div>
-          <div style="font-family:var(--ff-cond);font-weight:600;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--fg-dim)">D ◂ &nbsp;·&nbsp; ▸ R</div>
+          <div style="font-family:var(--ff-cond);font-weight:600;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--fg-dim)">Fewer ◂ &nbsp;·&nbsp; ▸ More</div>
         </div>
 
-        <div style="flex:1;position:relative;border:1px solid var(--border);border-radius:8px;background:#0C1A2E;overflow:hidden;min-height:480px">
+        <div style="position:relative;height:660px;border:1px solid var(--border);border-radius:10px;background:#0C1A2E;overflow:hidden">
           <div id="v-map" style="position:absolute;inset:0"></div>
-          <div style="position:absolute;top:16px;left:16px;z-index:500;display:flex;align-items:center;gap:11px;padding:9px 15px;border-radius:6px;background:rgba(196,42,42,.15);border:1px solid rgba(196,42,42,.42)">
+          <div style="position:absolute;top:18px;left:18px;z-index:500;display:flex;align-items:center;gap:11px;padding:9px 15px;border-radius:6px;background:rgba(196,42,42,.15);border:1px solid rgba(196,42,42,.42)">
             <span style="font-family:var(--ff-cond);font-weight:700;font-size:15px;letter-spacing:1px;text-transform:uppercase;color:#F87171">▲ R Holds</span>
             <span style="width:1px;height:16px;background:rgba(255,255,255,.2)"></span>
             <span style="font-family:var(--ff-cond);font-weight:700;font-size:16px;color:var(--fg);font-variant-numeric:tabular-nums">${leanLabelReg(HMAIN.margin)}</span>
           </div>
-          ${targetN ? `<div style="position:absolute;top:16px;right:16px;z-index:500;display:flex;align-items:center;gap:8px;padding:7px 13px;border-radius:6px;background:rgba(12,26,46,.72);border:1px solid var(--border);backdrop-filter:blur(6px)"><span style="color:var(--gold);font-size:12px">◎</span><span style="font-family:var(--ff-cond);font-weight:600;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--gold-lt)">${targetN} Target Town${targetN > 1 ? "s" : ""}</span></div>` : ""}
-          <div style="position:absolute;left:16px;bottom:16px;z-index:500;padding:13px 15px;border-radius:8px;background:rgba(6,17,31,.74);border:1px solid var(--border-strong);backdrop-filter:blur(8px)">
-            <div style="font-family:var(--ff-cond);font-weight:600;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--fg-muted);margin-bottom:9px">Town Margin</div>
-            <div style="display:flex;flex-direction:column;gap:6px;font-family:var(--ff-body);font-size:11px;color:var(--fg-dim)">
-              ${[["#1D4ED8", "Safe D"], ["#5B8DEF", "Lean D"], ["#5B6B7E", "Toss-Up"], ["#E5564F", "Lean R"], ["#C42A2A", "Safe R"]].map(([c, l]) => `<div style="display:flex;align-items:center;gap:9px"><span style="width:22px;height:10px;border-radius:2px;background:${c}"></span>${l}</div>`).join("")}
-            </div>
+          ${targetN ? `<div style="position:absolute;top:18px;right:18px;z-index:500;display:flex;align-items:center;gap:8px;padding:7px 13px;border-radius:6px;background:rgba(12,26,46,.72);border:1px solid var(--border);backdrop-filter:blur(6px)"><span style="color:var(--gold);font-size:12px">◎</span><span style="font-family:var(--ff-cond);font-weight:600;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--gold-lt)">${targetN} Target Town${targetN > 1 ? "s" : ""}</span></div>` : ""}
+          <div style="position:absolute;left:18px;bottom:18px;z-index:500;padding:14px 16px;border-radius:8px;background:rgba(6,17,31,.74);border:1px solid var(--border-strong);backdrop-filter:blur(8px)">
+            <div style="font-family:var(--ff-cond);font-weight:600;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--fg-muted);margin-bottom:9px">Active Registration</div>
+            <div style="width:150px;height:10px;border-radius:3px;background:linear-gradient(90deg,${regColor(rMin, rMin, rMax)},${regColor(rMax, rMin, rMax)})"></div>
+            <div style="display:flex;justify-content:space-between;margin-top:6px;font-family:var(--ff-cond);font-weight:600;font-size:10px;color:var(--fg-dim);font-variant-numeric:tabular-nums"><span>${fmt(rMin)}</span><span>${fmt(rMax)}</span></div>
           </div>
         </div>
       </section>
@@ -693,36 +704,39 @@ ROUTES.verdict = function (view) {
   setTimeout(() => verdictMap(recs, byName, () => paintSel()), 30);
 };
 
-/* real 4-town district map, colored by 2024 House margin, click to select */
+/* real 4-town district map, colored by active registration, click to select */
 function verdictMap(recs, byName, onPick) {
   const host = document.getElementById("v-map");
   if (!host || !GEO || !GEO.towns) return;
+  const regs = recs.map(r => r.reg), rMin = Math.min(...regs), rMax = Math.max(...regs);
   const map = L.map("v-map", { scrollWheelZoom: false, zoomControl: false, attributionControl: false,
     dragging: false, doubleClickZoom: false, boxZoom: false, keyboard: false, touchZoom: false });
-  const styleFor = f => { const r = byName[f.properties.town]; const sel = f.properties.town === verdictSel;
-    return { fillColor: r ? vColor(r.margin) : "#25313f", fillOpacity: .94, color: sel ? "#F0B82A" : "rgba(255,255,255,.18)", weight: sel ? 2.5 : 1 }; };
+  const byLayer = {};
+  const styleFor = name => { const r = byName[name]; const sel = name === verdictSel;
+    return { fillColor: r ? regColor(r.reg, rMin, rMax) : "#25313f", fillOpacity: .95,
+      color: sel ? "#F0B82A" : "rgba(255,255,255,.16)", weight: sel ? 2.5 : 1 }; };
+  const applyOne = name => { if (byLayer[name]) byLayer[name].setStyle(styleFor(name)); };
   const layer = L.geoJSON(GEO.towns, {
-    style: styleFor,
+    style: f => styleFor(f.properties.town),
     onEachFeature: (f, lyr) => {
-      const name = f.properties.town; const r = byName[name]; if (!r) return;
+      const name = f.properties.town; if (!byName[name]) return;
+      byLayer[name] = lyr;
       lyr.on({
-        click: () => { verdictSel = name; layer.setStyle(styleFor); onPick(); },
-        mouseover: e => { if (name !== verdictSel) e.target.setStyle({ color: "rgba(255,255,255,.55)", weight: 1.5 }); },
-        mouseout: () => layer.setStyle(styleFor),
+        click: () => { const prev = verdictSel; verdictSel = name; applyOne(prev); applyOne(name); onPick(); },
+        mouseover: e => { if (name !== verdictSel) e.target.setStyle({ color: "rgba(255,255,255,.5)", weight: 1.5 }); },
+        mouseout: () => applyOne(name),
       });
     }
   }).addTo(map);
-  map.fitBounds(layer.getBounds(), { padding: [34, 34] });
+  map.fitBounds(layer.getBounds(), { padding: [40, 40] });
   (window._maps = window._maps || []).push(map);
-  // permanent town labels: name + margin
+  // permanent town labels: name + active registration
   GEO.towns.features.forEach(f => {
-    const name = f.properties.town, r = byName[name]; if (!r) return;
-    const sub = layer.getLayers().filter(l => l.feature.properties.town === name);
-    if (!sub.length) return;
-    const c = sub[0].getBounds().getCenter();
+    const name = f.properties.town, r = byName[name]; if (!byLayer[name] || !r) return;
+    const c = byLayer[name].getBounds().getCenter();
     L.tooltip({ permanent: true, direction: "center", className: "v-town-lbl", opacity: 1 })
       .setLatLng(c)
-      .setContent(`<div style="text-align:center;pointer-events:none;text-shadow:0 2px 10px rgba(0,0,0,.7)"><div style="font-family:var(--ff-display);font-weight:800;font-size:16px;letter-spacing:1px;text-transform:uppercase;color:#fff;line-height:1">${name}</div><div style="font-family:var(--ff-cond);font-weight:700;font-size:13px;color:rgba(255,255,255,.85);margin-top:2px">${leanLabelReg(r.margin)}</div></div>`)
+      .setContent(`<div style="text-align:center;pointer-events:none;text-shadow:0 2px 10px rgba(0,0,0,.7)"><div style="font-family:var(--ff-display);font-weight:800;font-size:17px;letter-spacing:1px;text-transform:uppercase;color:#fff;line-height:1">${name}</div><div style="font-family:var(--ff-cond);font-weight:700;font-size:15px;color:rgba(255,255,255,.9);margin-top:3px;font-variant-numeric:tabular-nums">${fmt(r.reg)}</div></div>`)
       .addTo(map);
   });
 }
@@ -732,9 +746,9 @@ let analysisMetric = "persuasion_share";
 let analysisTown = null;
 const METRIC_SHORT = { persuasion_share: "Persuasion load", true_swing_rate: "True swing", base_lean_rate: "Base + lean", outdoor_l2_rate: "Outdoor / gun L2", election_day_rate: "Election Day" };
 const METRIC_STYLE = {
-  persuasion_share:  { rgb: [91, 117, 147],  hex: "#9DB4CC", legend: "Share of persuasion core" },
-  true_swing_rate:   { rgb: [125, 148, 173], hex: "#B7C6D8", legend: "Convertible swing rate" },
-  base_lean_rate:    { rgb: [26, 139, 154],  hex: "#22AABC", legend: "Base & lean to protect" },
+  persuasion_share:  { rgb: [139, 92, 246],  hex: "#A78BFA", legend: "Share of persuasion core" },
+  true_swing_rate:   { rgb: [167, 139, 250], hex: "#C4B5FD", legend: "Convertible swing rate" },
+  base_lean_rate:    { rgb: [207, 65, 51],   hex: "#F06A5A", legend: "Base & lean to protect" },
   outdoor_l2_rate:   { rgb: [212, 160, 23],  hex: "#F0B82A", legend: "Outdoor / gun L2 cluster" },
   election_day_rate: { rgb: [34, 170, 188],  hex: "#22AABC", legend: "Election Day load" },
 };
@@ -766,7 +780,7 @@ ROUTES.analysis = function (view) {
   const kpis = [
     ["Gap After Base", fmt(V.gap_after_base), "var(--rep-lt)", "votes beyond base GOTV"],
     ["Base + Lean Gap", fmt(V.gap_after_base_plus_lean), "var(--gold-lt)", "net votes still required"],
-    ["Persuasion Core", fmt(V.persuasion_core), "var(--npa-lt)", "swing + crossover pool"],
+    ["Persuasion Core", fmt(V.persuasion_core), "var(--persuasion-lt)", "swing + crossover pool"],
     ["Target Cushion", fmt(V.target_overage), "var(--teal-lt)", "targets over win number"],
   ].map(([l, v, c, n]) => `<div class="stat" style="--accent:${c};"><div class="sl">${l}</div><div class="sv">${v}</div><div class="ss">${n}</div></div>`).join("");
 
@@ -774,10 +788,10 @@ ROUTES.analysis = function (view) {
 
   // selected-town detail panel (folds L2 texture into the console)
   const job = (sd.true_swing || 0) > 500 ? "Persuasion battlefield" : "Base / lean protection";
-  const jobAccent = (sd.true_swing || 0) > 500 ? "var(--npa-lt)" : "var(--teal-lt)";
+  const jobAccent = (sd.true_swing || 0) > 500 ? "var(--persuasion-lt)" : "var(--base-lt)";
   const detailRows = [
-    ["Persuasion share", pc1(sd.persuasion_share), "var(--npa-lt)"],
-    ["Base + lean", pc1(sd.base_lean_rate), "var(--teal-lt)"],
+    ["Persuasion share", pc1(sd.persuasion_share), "var(--persuasion-lt)"],
+    ["Base + lean", pc1(sd.base_lean_rate), "var(--base-lt)"],
     ["Election Day", pc1(sd.election_day_rate), "var(--teal-lt)"],
     ["Outdoor / gun", pc1(sd.outdoor_l2_rate), "var(--gold-lt)"],
     ["Age 50+", pc1(sd.age_50_plus_rate), "var(--fg)"],
@@ -905,18 +919,24 @@ ROUTES.targets = function (view) {
   const partyName = p => (TARGET.party_labels && TARGET.party_labels[p]) || p;
   const entries = obj => Object.entries(obj || {}).sort((a, b) => b[1] - a[1]);
   const typeColors = ["var(--teal-lt)", "var(--gold-lt)", "var(--npa-lt)", "var(--dem-lt)", "var(--fg-muted)"];
+  // program semantics: BASE = red, PERSUASION (incl. swing/lean) = purple, weak-D = blue
+  const progColor = l => { const t = l.toLowerCase();
+    return t.includes("base") ? "var(--base-lt)"
+      : t.includes("weak dem") ? "var(--dem-lt)"
+      : (t.includes("persuas") || t.includes("swing") || t.includes("lean")) ? "var(--persuasion-lt)"
+      : "var(--fg-muted)"; };
   const barMix = (label, valStr, c, w, lw) => `<div style="display:flex;align-items:center;gap:14px;margin-bottom:12px;">
     <span class="tag" style="color:var(--fg);width:${lw || 160}px;flex-shrink:0;line-height:1.25;">${label}</span>
     <span class="r-num" style="font-size:14px;color:${c};width:52px;text-align:right;flex-shrink:0;">${valStr}</span>
     <div style="flex:1;height:8px;background:rgba(255,255,255,.06);border-radius:4px;overflow:hidden;"><div style="height:100%;width:${w}%;background:${c};border-radius:4px;"></div></div>
   </div>`;
-  const mixBlock = (pairs, lw) => { const max = Math.max(...pairs.map(p => p[1])) || 1; return pairs.map(([l, v], i) => barMix(l, fmt(v), typeColors[i] || "var(--fg-muted)", Math.max(2, 100 * v / max), lw)).join(""); };
-  const typeMix = mixBlock(entries(s.target_types), 210);
+  const mixBlock = (pairs, lw, colorFn) => { const max = Math.max(...pairs.map(p => p[1])) || 1; return pairs.map(([l, v], i) => barMix(l, fmt(v), colorFn ? colorFn(l) : (typeColors[i] || "var(--fg-muted)"), Math.max(2, 100 * v / max), lw)).join(""); };
+  const typeMix = mixBlock(entries(s.target_types), 210, progColor);
   const partyMix = mixBlock(entries(s.parties).map(([k, v]) => [partyName(k), v]), 110);
   const targetMetrics = {
     target_rate:   { label: "Target rate", get: t => t.target_rate, fmt: pc1, color: [34, 170, 188],  hex: "#22AABC", legend: "Targets ÷ likely voters" },
     targets:       { label: "Targets", get: t => t.targets, fmt: fmt, color: [212, 160, 23],  hex: "#F0B82A", legend: "Total targets" },
-    persuasion:    { label: "Persuasion", get: t => t.persuasion, fmt: fmt, color: [91, 117, 147], hex: "#9DB4CC", legend: "Persuasion targets" },
+    persuasion:    { label: "Persuasion", get: t => t.persuasion, fmt: fmt, color: [139, 92, 246], hex: "#A78BFA", legend: "Persuasion targets" },
     dem_crossover: { label: "Weak D crossover", get: t => t.dem_crossover, fmt: fmt, color: [96, 165, 250],  hex: "#60A5FA", legend: "Weak-D crossover targets" },
   };
   if (!targetMetrics[targetMetric]) targetMetric = "target_rate";
@@ -927,12 +947,12 @@ ROUTES.targets = function (view) {
   if (!TARGET.towns.some(t => t.town === targetTown)) targetTown = TARGET.towns[0] ? TARGET.towns[0].town : null;
   const sdt = TARGET.towns.find(t => t.town === targetTown) || {};
   const job = (sdt.persuasion || 0) > 1000 ? "Persuasion battlefield" : "High target rate";
-  const jobAccent = (sdt.persuasion || 0) > 1000 ? "var(--npa-lt)" : "var(--teal-lt)";
+  const jobAccent = (sdt.persuasion || 0) > 1000 ? "var(--persuasion-lt)" : "var(--teal-lt)";
   const detailRows = [
     ["Likely", fmt(sdt.likely), "var(--fg-dim)"],
     ["Targets", fmt(sdt.targets), "var(--fg)"],
     ["Rate", pc1(sdt.target_rate), "var(--gold-lt)"],
-    ["Persuasion", fmt(sdt.persuasion), "var(--npa-lt)"],
+    ["Persuasion", fmt(sdt.persuasion), "var(--persuasion-lt)"],
     ["Weak D", fmt(sdt.dem_crossover), "var(--dem-lt)"],
     ["U/IT out", fmt(sdt.u_it_not_targeted), "var(--fg-dim)"],
   ].map(([k, v, c]) => `<div class="dpanel-row"><span class="k">${k}</span><span class="r-num" style="font-size:15px;color:${c};">${v}</span></div>`).join("");
