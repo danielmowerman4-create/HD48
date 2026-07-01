@@ -41,7 +41,7 @@ const NAV = [
   ["verdict", "Verdict"],
   ["analysis", "Analysis"],
   ["targets", "Targets"],
-  ["geography", "Map"],
+  ["geography", "Data"],
   ["results", "Results"],
 ];
 function buildNav() {
@@ -88,39 +88,63 @@ function chart(parent, cfg, h) {
 const gridX = { grid: { display: false }, ticks: { autoSkip: false } };
 const gridY = { grid: { color: "rgba(255,255,255,.05)" }, border: { display: false }, ticks: { precision: 0 } };
 
-/* ============================ GEOGRAPHY ============================ */
-let geoMetric = "republican_share";
-const GEO_METRICS = {
-  republican_share: { label: "Republican share", get: t => t.party_pct.Republican, fmt: pc1, ramp: "r" },
-  unaffiliated_share: { label: "Unaffiliated share", get: t => t.party_pct.Unaffiliated, fmt: pc1, ramp: "u" },
-  democratic_share: { label: "Democratic share", get: t => t.party_pct.Democratic, fmt: pc1, ramp: "d" },
-  turnout_gap: { label: "Low-turnout share", get: t => pct(t.tier.Low + t.tier.None, t.active), fmt: pc1, ramp: "a" },
-  active: { label: "Active voters", get: t => t.active, fmt: fmt, ramp: "a" },
-};
+/* ============================ DATA · EXPORT ============================ */
+let exportView = "town";
+function selectExportView(v) { exportView = v; route(); }
 ROUTES.geography = function (view) {
-  pageHead(view, "Town & Precinct Analysis",
-    "Recolor the map by metric. Click any area to drill in.");
+  const TW = townList();
+  const s = TARGET && TARGET.summary;
+  const tByName = Object.fromEntries((TARGET && TARGET.towns ? TARGET.towns : []).map(t => [t.town, t]));
+  const partyTgt = { "Republican": s ? s.parties.R : null, "Unaffiliated": s ? s.parties.U : null,
+    "Democratic": s ? s.parties.D : null, "Minor / Other": s ? ((s.parties.IT || 0) + (s.parties.L || 0) + (s.parties.G || 0)) : null };
 
-  if (GEO && GEO.towns && GEO.towns.features.length) {
-    const mapCard = el("div", "card pad");
-    const ctl = el("div", "between"); ctl.style.marginBottom = "12px";
-    ctl.innerHTML = `<p class="section-title" style="margin:0">District map</p>`;
-    const sel = el("select");
-    sel.innerHTML = Object.entries(GEO_METRICS).map(([k, m]) => `<option value="${k}" ${k === geoMetric ? "selected" : ""}>${m.label}</option>`).join("");
-    sel.onchange = () => { geoMetric = sel.value; paintMap(); };
-    ctl.appendChild(sel); mapCard.appendChild(ctl);
-    mapCard.appendChild(el("div")).id = "map";
-    const lg = el("div", "legend"); lg.id = "map-legend"; lg.style.marginTop = "10px"; mapCard.appendChild(lg);
-    view.appendChild(mapCard);
-    setTimeout(initMap, 30);
-  } else {
-    const note = el("div", "note info");
-    note.innerHTML = "<div>Town polygons unavailable — map shown at town level only.</div>";
-    view.appendChild(note);
-  }
+  const VIEWS = {
+    town:  { label: "By Town", note: "Active registration by town", accent: "var(--teal-lt)",
+      cols: [{ k: "town", l: "Town" }, { k: "active", l: "Active", n: 1 }, { k: "rep", l: "Republican", n: 1 }, { k: "una", l: "Unaffiliated", n: 1 }, { k: "dem", l: "Democratic", n: 1 }],
+      rows: TW.map(t => ({ town: t.name, active: t.active, rep: t.party.Republican, una: t.party.Unaffiliated, dem: t.party.Democratic })) },
+    party: { label: "By Party", note: "District registration and target universe by party", accent: "var(--gold-lt)",
+      cols: [{ k: "party", l: "Party" }, { k: "reg", l: "Registered", n: 1 }, { k: "pct", l: "% Active" }, { k: "tgt", l: "In Target Universe", n: 1 }],
+      rows: PARTY.map(p => ({ party: p, reg: T.party[p], pct: pc1(T.party_pct[p]), tgt: partyTgt[p] })) },
+    rep:   { label: "Republican Targets", note: "Base GOTV — registered Republicans to turn out", accent: "var(--base-lt)",
+      cols: [{ k: "town", l: "Town" }, { k: "rep", l: "Registered R", n: 1 }, { k: "pct", l: "% of Town" }],
+      rows: TW.map(t => ({ town: t.name, rep: t.party.Republican, pct: pc1(t.party_pct.Republican) })) },
+    unaff: { label: "Unaffiliated Targets", note: "Persuasion universe — unaffiliated-heavy persuadables", accent: "var(--persuasion-lt)",
+      cols: [{ k: "town", l: "Town" }, { k: "pers", l: "Persuasion Targets", n: 1 }, { k: "rate", l: "Target Rate" }],
+      rows: TW.map(t => { const x = tByName[t.name] || {}; return { town: t.name, pers: x.persuasion || 0, rate: pc1(x.target_rate || 0) }; }) },
+    dem:   { label: "Democrat Targets", note: "Democratic crossover targets", accent: "#60A5FA",
+      cols: [{ k: "town", l: "Town" }, { k: "cross", l: "Crossover Targets", n: 1 }],
+      rows: TW.map(t => { const x = tByName[t.name] || {}; return { town: t.name, cross: x.dem_crossover || 0 }; }) },
+  };
+  if (!VIEWS[exportView]) exportView = "town";
+  const V = VIEWS[exportView];
 
-  view.appendChild(sectionCard("Towns", rankTable(townList(), "town")));
-  view.appendChild(sectionCard("Precincts", rankTable(precList(), "precinct")));
+  const chips = Object.entries(VIEWS).map(([k, v]) => `<button class="seg-btn ${k === exportView ? "on" : ""}" data-xview="${k}">${v.label}</button>`).join("");
+  const totals = {}; V.cols.forEach(c => { if (c.n) totals[c.k] = V.rows.reduce((a, r) => a + (typeof r[c.k] === "number" ? r[c.k] : 0), 0); });
+  const body = V.rows.map(r => `<tr>${V.cols.map(c => `<td class="${c.n ? "num" : "nm"}">${c.n ? fmt(r[c.k]) : (r[c.k] == null ? "—" : r[c.k])}</td>`).join("")}</tr>`).join("");
+  const totalRow = `<tr style="background:rgba(255,255,255,.02)">${V.cols.map((c, i) => `<td class="${c.n ? "num" : ""}" style="font-family:var(--ff-cond);font-weight:700;font-size:13px;color:var(--fg);border-top:2px solid var(--border-strong)">${i === 0 ? "Total" : (c.n ? fmt(totals[c.k]) : "")}</td>`).join("")}</tr>`;
+
+  view.innerHTML = vhead("Field Data", "var(--teal-lt)", "Data · Export", "Aggregate · SOTS + L2") +
+    `<p style="color:var(--fg-muted);font-size:13px;max-width:78ch;margin:-6px 0 16px;line-height:1.55">Filter the district by town, party and target program, then download any view as CSV. Aggregate counts only — no individual voter records.</p>
+     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">${chips}</div>
+     <div class="vcard" style="padding:0;overflow:hidden">
+       <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;padding:16px 20px 14px;flex-wrap:wrap">
+         <div><span class="rlabel" style="color:${V.accent}">${V.label}</span><div style="font-family:var(--ff-body);font-size:11px;color:var(--fg-dim);margin-top:4px">${V.note}</div></div>
+         <button class="btn pri" id="dl-csv" style="padding:9px 16px;font-size:12px;letter-spacing:1.5px;border-radius:5px">Download CSV ↓</button>
+       </div>
+       <div class="tbl-wrap pretty" style="border-radius:0;border-left:0;border-right:0;border-bottom:0"><table class="dtable"><thead><tr>${V.cols.map(c => `<th class="${c.n ? "num" : ""}">${c.l}</th>`).join("")}</tr></thead><tbody>${body}${totalRow}</tbody></table></div>
+     </div>
+     <div class="vbanner" style="margin-top:16px"><span class="tag" style="font-size:10px;color:var(--gold)">Aggregate</span><span class="kicker" style="text-transform:none;letter-spacing:0;font-family:var(--ff-body);font-size:10.5px">Counts only — no individual voter records are exported.</span></div>`;
+
+  view.querySelectorAll("[data-xview]").forEach(b => b.onclick = () => selectExportView(b.dataset.xview));
+  const dl = view.querySelector("#dl-csv");
+  if (dl) dl.onclick = () => {
+    const head = V.cols.map(c => c.l).join(",");
+    const lines = V.rows.map(r => V.cols.map(c => String(r[c.k] == null ? "" : r[c.k])).join(","));
+    const tot = V.cols.map((c, i) => i === 0 ? "Total" : (c.n ? totals[c.k] : "")).join(",");
+    const csv = [head, ...lines, tot].join("\n");
+    const a = el("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    a.download = `hd48_${exportView}.csv`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
+  };
 };
 
 function rankTable(rows, kind) {
@@ -182,16 +206,6 @@ function sortable(cols, data, rowFn) {
 }
 
 /* ---- Leaflet map ---- */
-let _map, _layer;
-function initMap() {
-  if (!document.getElementById("map")) return;
-  _map = L.map("map", { scrollWheelZoom: false, attributionControl: false });
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png", { maxZoom: 18 }).addTo(_map);
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png", { maxZoom: 18, pane: "markerPane" }).addTo(_map);
-  _map.fitBounds(GEO.bounds, { padding: [18, 18] });
-  (window._maps = window._maps || []).push(_map);
-  paintMap();
-}
 /* generic choropleth builder (used by the turnout map) */
 function makeMap(id, getVal, label, fmtFn, ramp, legendId) {
   const map = L.map(id, { scrollWheelZoom: false, attributionControl: false });
@@ -220,29 +234,6 @@ function rampColor(v, min, max, ramp) {
   const base = ramp === "r" ? [224, 85, 85] : ramp === "d" ? [58, 106, 184] : ramp === "u" ? [120, 134, 156] : [34, 170, 188];
   const lo = [18, 33, 51];
   return `rgb(${lo.map((c, i) => Math.round(c + (base[i] - c) * (0.22 + .78 * t))).join(",")})`;
-}
-function paintMap() {
-  if (!_map) return;
-  if (_layer) _map.removeLayer(_layer);
-  const m = GEO_METRICS[geoMetric];
-  const vals = GEO.towns.features.map(f => { const t = TOWNS[f.properties.town]; return t ? m.get(t) : 0; });
-  const min = Math.min(...vals), max = Math.max(...vals);
-  _layer = L.geoJSON(GEO.towns, {
-    style: f => { const t = TOWNS[f.properties.town]; const v = t ? m.get(t) : 0;
-      return { fillColor: rampColor(v, min, max, m.ramp), fillOpacity: .88, color: "#06111F", weight: 1.2 }; },
-    onEachFeature: (f, lyr) => {
-      const t = TOWNS[f.properties.town]; if (!t) return;
-      lyr.bindTooltip(`<b>${t.name}</b><br>${m.label}: ${m.fmt(m.get(t))}<br>${fmt(t.active)} active`, { sticky: true });
-      lyr.on({
-        mouseover: e => e.target.setStyle({ weight: 3, color: "#22AABC" }),
-        mouseout: e => _layer.resetStyle(e.target),
-        click: () => drillTown(t, "town"),
-      });
-    }
-  }).addTo(_map);
-  $("#map-legend").innerHTML = `<span class="muted">${m.label}:</span>` +
-    `<span><i style="background:${rampColor(min, min, max, m.ramp)}"></i>${m.fmt(min)}</span>` +
-    `<span><i style="background:${rampColor(max, min, max, m.ramp)}"></i>${m.fmt(max)}</span>`;
 }
 
 /* ============================ TURNOUT ============================ */
@@ -528,7 +519,7 @@ const RAIL_CTX = {
   verdict:   ["Verdict",  "Where the race stands today: the margin to protect, the universe to move, and the votes still in play."],
   analysis:  ["Analysis", "Fixed-universe read on how base, lean and persuasion stack against the win number, town by town."],
   targets:   ["Targets",  "One contact universe: who to reach, by program and geography, mapped for field and paid."],
-  geography: ["Map",      "District recolored by lean, persuasion, turnout and size. Click any town or precinct to drill in."],
+  geography: ["Data",     "Export the district by town, party and target program. Aggregate counts, downloadable as CSV."],
   results:   ["Results",  "Certified returns by office and town, with swing against the prior comparable race."],
 };
 function renderRail(active) {
@@ -854,6 +845,29 @@ ROUTES.analysis = function (view) {
       <div class="vcard" style="padding:20px 22px;">
         <div class="rlabel" style="margin-bottom:14px;">Who Lives Here<span class="rlabel" style="color:var(--fg-dim);margin-left:8px;">age bands</span></div>
         <div style="display:flex;flex-direction:column;gap:11px;">${barRows(CON.age_bands, V.targets, "var(--gold-lt)")}</div>
+      </div>
+    </div>
+
+    <div class="vcard" style="padding:20px 22px;margin-top:16px;">
+      <div class="rlabel" style="margin-bottom:16px;">Party Registration by Town<span class="rlabel" style="color:var(--fg-dim);margin-left:8px;">who is on the rolls</span></div>
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        ${townList().map(t => {
+          const segs = [["Republican", "var(--base-lt)"], ["Unaffiliated", "#8AA0BC"], ["Democratic", "#60A5FA"], ["Minor / Other", "var(--gold-lt)"]];
+          const bar = segs.map(([p, c]) => `<div style="width:${t.party_pct[p]}%;background:${c}"></div>`).join("");
+          return `<div>
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
+              <span class="r-num" style="font-size:14px;color:var(--fg);">${t.name}</span>
+              <span class="r-num" style="font-size:12px;color:var(--fg-muted);">${fmt(t.active)} active · <span style="color:var(--base-lt);">${pc1(t.party_pct.Republican)} R</span></span>
+            </div>
+            <div style="display:flex;height:12px;border-radius:3px;overflow:hidden;background:rgba(255,255,255,.05);">${bar}</div>
+          </div>`;
+        }).join("")}
+      </div>
+      <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:16px;font-family:var(--ff-body);font-size:11px;color:var(--fg-dim);">
+        <span style="display:flex;align-items:center;gap:6px;"><i style="width:11px;height:11px;border-radius:2px;background:var(--base-lt);"></i>Republican</span>
+        <span style="display:flex;align-items:center;gap:6px;"><i style="width:11px;height:11px;border-radius:2px;background:#8AA0BC;"></i>Unaffiliated</span>
+        <span style="display:flex;align-items:center;gap:6px;"><i style="width:11px;height:11px;border-radius:2px;background:#60A5FA;"></i>Democratic</span>
+        <span style="display:flex;align-items:center;gap:6px;"><i style="width:11px;height:11px;border-radius:2px;background:var(--gold-lt);"></i>Minor</span>
       </div>
     </div>
 
@@ -1185,112 +1199,6 @@ ROUTES.plan = function (view) {
     <div class="vrow" style="grid-template-columns:repeat(4,1fr);">${pillars}</div>
     <div class="vbanner"><span class="tag" style="font-size:10px;color:var(--gold);">Note</span><span class="kicker" style="text-transform:none;letter-spacing:0;font-family:var(--ff-body);font-size:10.5px;">Pillar metrics are SOTS-derived; allocation, timeline and bank targets are a recommended program, not data.</span></div>`;
 };
-
-/* ───────────────── GEOGRAPHY · TOWN & PRECINCT ───────────────── */
-let geoMode = "town";
-/* fixed-domain metrics — color is anchored to absolute thresholds, so a small
-   real gap reads as a small visual gap (no min/max stretching). */
-function gSeq(v, lo, hi, base) { const t = Math.max(0, Math.min(1, (v - lo) / (hi - lo))); const f = [20, 32, 50]; return `rgb(${f.map((c, i) => Math.round(c + (base[i] - c) * (0.16 + 0.84 * t))).join(",")})`; }
-const GEOM = {
-  lean:    { label: "Registration lean", get: t => t.party_pct.Democratic - t.party_pct.Republican, fmt: v => (v >= 0 ? "D+" : "R+") + (Math.round(Math.abs(v) * 10) / 10), color: v => colorForMargin(v), anchors: [["var(--safe-r)", "R+15"], ["var(--tossup)", "Even"], ["var(--safe-d)", "D+15"]] },
-  unaff:   { label: "Persuasion pool", get: t => t.party_pct.Unaffiliated, fmt: pc1, color: v => gSeq(v, 30, 50, [167, 139, 250]), anchors: [["#2c2942", "30%"], ["#A78BFA", "50%"]] },
-  turnout: { label: "Turnout risk", get: t => pct(t.tier.Low + t.tier.None, t.active), fmt: pc1, color: v => gSeq(v, 8, 40, [240, 184, 42]), anchors: [["#2c2a1d", "8%"], ["#F0B82A", "40%+"]] },
-  size:    { label: "Active voters", get: t => t.active, fmt: fmt, color: v => gSeq(v, 0, 5500, [34, 170, 188]), anchors: [["#16313b", "fewer"], ["#22AABC", "more"]] },
-};
-ROUTES.geography = function (view) {
-  if (!GEOM[geoMetric]) geoMetric = "lean";
-  const m = GEOM[geoMetric];
-  const metricKeys = [["lean", "Lean"], ["unaff", "Persuasion"], ["turnout", "Turnout"], ["size", "Size"]];
-  const seg = metricKeys.map(([k, lab]) => `<button class="seg-btn ${k === geoMetric ? "on" : ""}" data-k="${k}">${lab}</button>`).join("");
-  const modeSeg = [["town", "Town"], ["precinct", "Precinct"]].map(([k, lab]) => `<button class="seg-btn ${k === geoMode ? "on" : ""}" data-m="${k}">${lab}</button>`).join("");
-
-  const towns = townList();
-  const precs = corePrec();
-  const list = geoMode === "town"
-    ? towns.map(t => ({ name: t.name, v: m.get(t), sub: fmt(t.active) + " act", col: m.color(m.get(t)), kind: "town", obj: t }))
-    : precs.map(p => ({ name: p.name, v: m.get(p), sub: fmt(p.active) + " act", col: m.color(m.get(p)), kind: "precinct", obj: p }));
-  const rankRows = list.map((r, i) => `<div class="prow" data-i="${i}" role="button" tabindex="0" style="padding:13px 12px;">
-    <span style="width:12px;height:12px;border-radius:3px;background:${r.col};flex-shrink:0;"></span>
-    <span class="r-num" style="font-size:16px;flex:1;min-width:0;color:var(--fg);">${r.name}</span>
-    <span class="r-num" style="font-size:15px;color:var(--gold-lt);">${m.fmt(r.v)}</span>
-    <span class="rlabel" style="width:74px;text-align:right;">${r.sub}</span></div>`).join("");
-
-  view.innerHTML =
-    vhead("Geographic Breakdown · Recolor By Metric", "var(--teal-lt)", "Town & Precinct", "Click any area to drill in") +
-    `<div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center;margin-bottom:16px;">
-       <div class="seg">${seg}</div>
-       <div style="display:flex;align-items:center;gap:10px;"><span class="rlabel">Map by</span><div class="seg">${modeSeg}</div></div>
-     </div>
-    <div class="wpanel" style="grid-template-columns:1.7fr 1fr;gap:16px;align-items:start;">
-      <div class="console-card">
-        <div style="display:flex;align-items:baseline;justify-content:space-between;padding:14px 18px 12px;"><span class="rlabel">District Map · ${m.label}</span><span class="rlabel">${geoMode === "town" ? towns.length + " towns" : precs.length + " precincts"}</span></div>
-        <div id="gmap" style="height:520px;border:0;border-radius:0;"></div>
-        <div class="legend" id="gmap-legend" style="padding:14px 18px;border-top:1px solid var(--border);"></div>
-        ${geoMode === "precinct" ? `<div class="rlabel" style="font-size:9px;padding:0 18px 12px;color:var(--fg-dim);text-transform:none;letter-spacing:0;font-family:var(--ff-body);">Bubble size = active voters · placed within town (state publishes no precinct shapes)</div>` : ""}
-      </div>
-      <div class="vcard" style="padding:18px;">
-        <div class="rlabel" style="margin-bottom:12px;">${geoMode === "town" ? "Town" : "Precinct"} Rank · ${m.label}</div>
-        <div style="display:flex;flex-direction:column;gap:4px;">${rankRows}</div>
-      </div>
-    </div>`;
-
-  view.querySelectorAll(".seg")[0].querySelectorAll("button").forEach(b => b.onclick = () => { geoMetric = b.dataset.k; route(); });
-  view.querySelectorAll(".seg")[1].querySelectorAll("button").forEach(b => b.onclick = () => { geoMode = b.dataset.m; route(); });
-  view.querySelectorAll(".prow").forEach(el => {
-    const open = () => { const r = list[+el.dataset.i]; drillTown(r.obj, r.kind); };
-    el.onclick = open;
-    el.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } };
-  });
-  setTimeout(() => geoMap("gmap", m, geoMode, "gmap-legend"), 30);
-};
-function townCentroids() {
-  const c = {};
-  GEO.towns.features.forEach(f => {
-    const ring = f.geometry.type === "Polygon" ? f.geometry.coordinates[0] : f.geometry.coordinates[0][0];
-    let lat = 0, lng = 0; ring.forEach(([x, y]) => { lng += x; lat += y; });
-    c[f.properties.town] = [lat / ring.length, lng / ring.length];
-  });
-  return c;
-}
-function geoMap(id, m, mode, legendId) {
-  const map = L.map(id, { scrollWheelZoom: false, attributionControl: false });
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png", { maxZoom: 18 }).addTo(map);
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png", { maxZoom: 18, pane: "markerPane" }).addTo(map);
-  map.fitBounds(GEO.bounds, { padding: [18, 18] });
-  (window._maps = window._maps || []).push(map);
-  if (mode === "town") {
-    const layer = L.geoJSON(GEO.towns, {
-      style: f => { const t = TOWNS[f.properties.town]; return { fillColor: t ? m.color(m.get(t)) : "#0F1A2C", fillOpacity: .85, color: "#06111F", weight: 1.2 }; },
-      onEachFeature: (f, lyr) => { const t = TOWNS[f.properties.town]; if (!t) return;
-        lyr.bindTooltip(`<b>${t.name}</b><br>${m.label}: ${m.fmt(m.get(t))}<br>${fmt(t.active)} active`, { sticky: true });
-        lyr.on({ mouseover: e => e.target.setStyle({ weight: 3, color: "#22AABC" }), mouseout: e => layer.resetStyle(e.target), click: () => drillTown(t, "town") });
-      }
-    }).addTo(map);
-  } else {
-    L.geoJSON(GEO.towns, { style: { fillColor: "#0F1A2C", fillOpacity: .4, color: "rgba(255,255,255,.13)", weight: 1 } }).addTo(map);
-    const precs = corePrec();
-    const amax = Math.max(...precs.map(p => p.active));
-    const cent = townCentroids(); const byTown = {};
-    precs.forEach(p => { const t = precTown(p); (byTown[t] = byTown[t] || []).push(p); });
-    Object.entries(byTown).forEach(([town, ps]) => {
-      const c = cent[town]; if (!c) return;
-      ps.forEach((p, i) => {
-        const off = ps.length > 1 ? 0.02 : 0, ang = (i / ps.length) * 2 * Math.PI;
-        const ll = [c[0] + off * Math.cos(ang), c[1] + off * Math.sin(ang) * 1.4];
-        const rad = 8 + 16 * Math.sqrt(p.active / amax); // area ∝ voters
-        const mk = L.circleMarker(ll, { radius: rad, fillColor: m.color(m.get(p)), fillOpacity: .9, color: "#06111F", weight: 1.5 });
-        mk.bindTooltip(`<b>${p.name}</b><br>${m.label}: ${m.fmt(m.get(p))}<br>${fmt(p.active)} active`, { sticky: true });
-        mk.on("click", () => drillTown(p, "precinct"));
-        mk.on("mouseover", () => mk.setStyle({ weight: 3, color: "#22AABC" }));
-        mk.on("mouseout", () => mk.setStyle({ weight: 1.5, color: "#06111F" }));
-        mk.addTo(map);
-      });
-    });
-  }
-  const lg = legendId && document.getElementById(legendId);
-  if (lg) lg.innerHTML = `<span class="muted">${m.label}</span>` +
-    m.anchors.map(([c, l]) => `<span><i style="background:${c}"></i>${l}</span>`).join("");
-}
 
 /* ============================ DRILL-DOWN (aggregate) ============================ */
 function drillTown(t, kind) {
