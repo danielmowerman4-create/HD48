@@ -41,10 +41,6 @@ const NAV = [
 ];
 function buildNav() {
   const n = $("#nav");
-  // Overview = the standalone command front page (full-page link, not a hash route)
-  const ov = el("a", "tab"); ov.href = "overview.html";
-  ov.innerHTML = `<span class="tab-pip"></span>Overview`;
-  n.appendChild(ov);
   NAV.forEach(([id, lab]) => {
     const t = el("a", "tab"); t.dataset.route = id; t.href = "#" + id;
     t.innerHTML = `<span class="tab-pip"></span>${lab}`;
@@ -86,72 +82,6 @@ function chart(parent, cfg, h) {
 }
 const gridX = { grid: { display: false }, ticks: { autoSkip: false } };
 const gridY = { grid: { color: "rgba(255,255,255,.05)" }, border: { display: false }, ticks: { precision: 0 } };
-
-/* ============================ OVERVIEW ============================ */
-ROUTES.overview = function (view) {
-  pageHead(view, C.candidate + " — District Snapshot",
-    "Aggregate registration and turnout intelligence. No individual voter records.");
-
-  // four core registration numbers
-  const k = el("div", "kpis");
-  kpi(k, "Active voters", fmt(T.active), `${fmt(T.registered)} registered`);
-  kpi(k, "Republican", fmt(T.party.Republican), pc1(T.party_pct.Republican) + " of active", "r");
-  kpi(k, "Unaffiliated", fmt(T.party.Unaffiliated), pc1(T.party_pct.Unaffiliated) + " of active", "u");
-  kpi(k, "Democratic", fmt(T.party.Democratic), pc1(T.party_pct.Democratic) + " of active", "d");
-  view.appendChild(k);
-
-  // one clean party-balance bar (replaces the bar chart + legend)
-  view.appendChild(partyBar());
-
-  // the strategic takeaway
-  view.appendChild(narrative());
-
-  // towns at a glance
-  const tlist = el("div", "card"); tlist.style.marginTop = "22px";
-  const head = el("div", "pad between"); head.style.paddingBottom = "0";
-  head.innerHTML = `<p class="section-title" style="margin:0">Towns at a glance</p><a class="chip" href="#geography">Open geography →</a>`;
-  tlist.appendChild(head);
-  tlist.appendChild(rankTable(townList(), "town"));
-  view.appendChild(tlist);
-};
-
-function partyBar() {
-  const segs = [["Republican", "r"], ["Unaffiliated", "u"], ["Democratic", "d"], ["Minor / Other", "o"]];
-  const card = el("div", "card pad"); card.style.marginTop = "22px";
-  card.appendChild(el("p", "section-title", "Party balance of active voters<span class='ln'></span>"));
-  const bar = el("div", "pbar");
-  bar.innerHTML = segs.map(([p, c]) => {
-    const w = T.party_pct[p];
-    const inner = w >= 6 ? `<span>${c === "o" ? "Other" : shortP(p)}</span><b>${pc1(w)}</b>` : "";
-    return `<div class="pbar-seg ${c}" style="width:${w}%">${inner}</div>`;
-  }).join("");
-  card.appendChild(bar);
-  const lg = el("div", "pbar-legend");
-  lg.innerHTML = segs.map(([p, c]) =>
-    `<div class="it"><i class="${c}"></i><div><b>${fmt(T.party[p])}</b> <span class="muted">${c === "o" ? "Other" : shortP(p)}</span></div></div>`).join("");
-  card.appendChild(lg);
-  return card;
-}
-
-function narrative() {
-  const tw = townList();
-  const r = T.party_pct.Republican, u = T.party_pct.Unaffiliated, d = T.party_pct.Democratic;
-  const byR = [...tw].sort((x, y) => y.party_pct.Republican - x.party_pct.Republican);
-  const topR = byR[0], lowR = byR[byR.length - 1];
-  const byU = [...tw].sort((x, y) => y.party_pct.Unaffiliated - x.party_pct.Unaffiliated)[0];
-  const card = el("div", "narr"); card.style.marginTop = "22px";
-  let html = `<h3>The Read</h3>`;
-  if (C.posture === "defense") {
-    html += `<p>Registration is near-even — <b>${pc1(r)} R</b>, <b>${pc1(d)} D</b>, <b>${pc1(u)} U</b>. The seat turns on turnout and the unaffiliated margin, not party share.</p>`;
-    html += `<p>Strongest R ground: <b>${topR.name}</b> (${pc1(topR.party_pct.Republican)}). Most exposed: <b>${lowR.name}</b> (${pc1(lowR.party_pct.Republican)}). Unaffiliateds densest in <b>${byU.name}</b> (${pc1(byU.party_pct.Unaffiliated)}).</p>`;
-  } else {
-    const byRcount = [...tw].sort((x, y) => y.party.Republican - x.party.Republican)[0];
-    html += `<p>The universe is <b>${pc1(d)} D</b>, <b>${pc1(u)} U</b>, <b>${pc1(r)} R</b>. With the seat open, the path runs through unaffiliated voters, not party conversion.</p>`;
-    html += `<p>R votes concentrate in <b>${byRcount.name}</b>. <b>${fmt(T.tier.Low + T.tier.None)}</b> active voters are low-propensity — cheap to re-activate.</p>`;
-  }
-  card.innerHTML = html;
-  return card;
-}
 
 /* ============================ GEOGRAPHY ============================ */
 let geoMetric = "republican_share";
@@ -629,80 +559,173 @@ function renderRail(active) {
 }
 
 /* ───────────────── THE VERDICT (war-room body) ───────────────── */
+/* margin-scale palette (D positive → blue, R negative → red) */
+function vColor(m) { return m > 15 ? "#1D4ED8" : m > 5 ? "#5B8DEF" : m > -5 ? "#5B6B7E" : m > -15 ? "#E5564F" : "#C42A2A"; }
+function vLabel(m) { return m > 15 ? "Safe D" : m > 5 ? "Lean D" : m > -5 ? "Toss-Up" : m > -15 ? "Lean R" : "Safe R"; }
+function vTone(m)  { return m > 5 ? { txt: "#60A5FA", tint: "rgba(37,99,235,.15)", bd: "rgba(96,165,250,.35)" }
+  : m > -5 ? { txt: "#AEB9C6", tint: "rgba(148,163,184,.13)", bd: "rgba(148,163,184,.32)" }
+  : { txt: "#F87171", tint: "rgba(220,38,38,.14)", bd: "rgba(248,113,113,.35)" }; }
+let verdictSel = null;
+
 ROUTES.verdict = function (view) {
   const TS = TARGET && TARGET.summary;
   const dec = Math.abs(HMAIN.r - HMAIN.d);
-  const win = TARGET ? TARGET.win_number : winNumber;
-  const myV = myVotes;
-  const base = TS ? (TS.target_types["Base GOTV"] || 0) : T.high_turnout;
   const persu = TS ? TS.persuasion_targets : T.party.Unaffiliated;
-  const regist = TS ? TS.dem_crossover_targets : T.newly_registered;
-  const uSum = (base + persu + regist) || 1;
-  const pBase = base / uSum * 100, pPersu = persu / uSum * 100, pReg = regist / uSum * 100;
-  // concentration: how few precincts hold 60% of core active voters
-  const cp = corePrec().slice().sort((a, b) => b.active - a.active);
+  // concentration: how few towns hold 60% of active voters
+  const cp = townList().slice().sort((a, b) => b.active - a.active);
   const totAct = cp.reduce((s, p) => s + p.active, 0) || 1;
   let cum = 0, k = 0; for (const p of cp) { cum += p.active; k++; if (cum / totAct >= 0.6) break; }
   const concShare = Math.round(cum / totAct * 100);
-  // cycle margins (oldest → newest contested races)
-  const hist = (RES ? RES.order : []).map(kk => { const rc = RES.races[kk]; return ["’" + String(rc.year).slice(2) + " " + (rc.kind === "House" ? "H" : "P"), resTotals(rc).margin]; });
-  const cycCells = hist.map(([yr, m]) => {
-    const d = m >= 0, w = Math.min(50, Math.abs(m) * 9 + 8), col = d ? "var(--bar-d)" : "var(--bar-r)", tc = d ? "var(--dem-lt)" : "var(--rep-lt)";
-    return `<div class="cyc-cell"><span class="yr">${yr}</span>
-      <span class="mbar">${d ? `<i style="left:50%;width:${w}%;background:${col};"></i>` : `<i style="right:50%;width:${w}%;background:${col};"></i>`}</span>
-      <span class="mval" style="color:${tc};">${marginLabel(m)}</span></div>`;
-  }).join("");
-  // turnout sparkline
+
+  // real per-town records from the latest contested House race + registration + target model
+  const HR = HMAINrace;
+  const trows = TARGET && TARGET.towns ? TARGET.towns : [];
+  const recs = (RES ? RES.towns : []).map(name => {
+    const v = HR && HR.towns[name]; const two = v ? (v.d + v.r) : 0;
+    const margin = two ? 100 * (v.d - v.r) / two : 0;
+    const tt = trows.find(x => x.town === name) || {};
+    return { name, margin, dPct: two ? 100 * v.d / two : 0, rPct: two ? 100 * v.r / two : 0,
+      reg: TOWNS[name] ? TOWNS[name].active : 0, target: (tt.persuasion || 0) > 1000 };
+  });
+  const byName = Object.fromEntries(recs.map(r => [r.name, r]));
+  const targetN = recs.filter(r => r.target).length;
+  if (!byName[verdictSel]) verdictSel = (recs.find(r => r.target) || recs[0] || {}).name;
+
+  // turnout sparkline (real general-election ballots)
   const g = C.gen_years || {}; const yrs = [2018, 2020, 2022, 2024]; const gv = yrs.map(y => g[y] || 0);
-  const gmax = Math.max(...gv) || 1; const spPts = gv.map((v, i) => `${12 + i * 98},${(104 - (v / gmax) * 78).toFixed(1)}`);
-  const miniStat = (lab, val, col) => `<div style="background:var(--navy-card);border:1px solid var(--border);border-radius:8px;padding:16px 18px;">
-    <div class="rlabel">${lab}</div><div class="r-num" style="font-size:30px;margin-top:6px;color:${col};">${val}</div></div>`;
-  const meta = TARGET ? TARGET.generated_at.slice(0, 10) + " · SOTS + L2" : C.generated_at.slice(0, 10) + " · SOTS + returns";
+  const gmax = Math.max(...gv) || 1;
+  const tx = i => 10 + i * 88, ty = v => 78 - (v / gmax) * 66;
+  const spPts = gv.map((v, i) => `${tx(i)},${ty(v).toFixed(1)}`).join(" ");
+  const spDots = gv.map((v, i) => `<circle cx="${tx(i)}" cy="${ty(v).toFixed(1)}" r="4.5" fill="${i === 3 ? "var(--gold-lt)" : "var(--teal-lt)"}" stroke="var(--navy-mid)" stroke-width="2"></circle>`).join("");
+
+  // cycle margins (real, oldest → newest)
+  const cyc = (RES ? RES.order : []).map(kk => { const rc = RES.races[kk]; const m = resTotals(rc).margin;
+    return { yr: "’" + String(rc.year).slice(2) + " " + (rc.kind === "House" ? "H" : "P"), m }; });
+  const cycRows = cyc.map(c => {
+    const d = c.m >= 0, w = Math.min(Math.abs(c.m) / 6 * 50, 50), col = d ? "#3B82F6" : "#DC2626", tc = d ? "#60A5FA" : "#F87171";
+    const bar = d ? `right:50%;width:${w}%` : `left:50%;width:${w}%`;
+    return `<div style="display:flex;align-items:center;gap:12px">
+      <span style="width:52px;font-family:var(--ff-cond);font-weight:600;font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:var(--fg-muted)">${c.yr}</span>
+      <div style="position:relative;flex:1;height:9px;background:rgba(255,255,255,.05);border-radius:2px"><span style="position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:rgba(255,255,255,.2)"></span><span style="position:absolute;top:2px;bottom:2px;${bar};background:${col};border-radius:2px"></span></div>
+      <span style="width:46px;text-align:right;font-family:var(--ff-cond);font-weight:700;font-size:13px;color:${tc};font-variant-numeric:tabular-nums">${marginLabel(c.m)}</span></div>`;
+  }).join("");
+
+  const kpi = (n, lab, val, unit, sub, accent, valcol) => `<div style="background:var(--navy-card);border:1px solid var(--border);border-top:2px solid ${accent};border-radius:6px;padding:14px 16px 13px">
+    <div style="font-family:var(--ff-cond);font-weight:600;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:${accent}">${n} · ${lab}</div>
+    <div style="font-family:var(--ff-cond);font-weight:700;font-size:40px;line-height:1;color:${valcol || "var(--fg)"};margin:6px 0 8px;font-variant-numeric:tabular-nums">${val}${unit ? `<span style="font-size:23px;color:var(--fg-muted)">${unit}</span>` : ""}</div>
+    <div style="font-family:var(--ff-body);font-size:11px;color:var(--fg-muted)">${sub}</div></div>`;
 
   view.innerHTML = `
-    <div class="tray" style="margin-bottom:18px;">
-      <div class="tray-h"><span class="ttl">Path To Victory · Universe Split</span><span class="meta">${meta}</span></div>
-      <div class="usplit">
-        <div style="flex:${Math.max(8, pBase)};background:var(--teal);color:#05121b;">Base · ${fmtK(base)} · ${Math.round(pBase)}%</div>
-        <div style="flex:${Math.max(8, pPersu)};background:var(--gold);color:#241a02;">Persuasion · ${fmtK(persu)} · ${Math.round(pPersu)}%</div>
-        <div style="flex:${Math.max(3, pReg)};background:var(--npa);color:#fff;justify-content:center;padding:0 8px;">${Math.round(pReg)}%</div>
-      </div>
-    </div>
+    <div style="display:grid;grid-template-columns:1fr 336px;gap:20px;align-items:stretch">
+      <!-- CENTER: KPIs + district map -->
+      <section style="display:flex;flex-direction:column;min-width:0">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
+          ${kpi("01", "Margin", fmt(dec), "", "2024 decisive votes · protect the edge", "var(--camp-lt)")}
+          ${kpi("02", "Map", concShare, "%", `turf in ${k} town${k > 1 ? "s" : ""} · concentrate`, "var(--teal-lt)")}
+          ${kpi("03", "Targets", fmt(persu), "", "persuasion voters · win the swing", "var(--gold)", "var(--gold-lt)")}
+        </div>
 
-    <div class="wpanel cols-3" style="grid-template-columns:repeat(3,1fr);">
-      <div class="stat" style="--accent:var(--camp-lt);"><div class="sl">01 · Margin</div><div class="sv">${fmt(dec)}</div><div class="ss">2024 decisive votes · protect the edge</div></div>
-      <div class="stat" style="--accent:var(--teal-lt);"><div class="sl">02 · Map</div><div class="sv">${concShare}<span style="font-size:24px;color:var(--fg-muted);">%</span></div><div class="ss">voters in ${k} precincts · concentrate turf</div></div>
-      <div class="stat" style="--accent:var(--npa-lt);"><div class="sl">03 · Voters</div><div class="sv">${fmt(persu)}</div><div class="ss">${TARGET ? "persuasion targets" : "persuadables"} · win the swing</div></div>
-    </div>
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;padding:20px 2px 10px">
+          <div>
+            <div style="font-family:var(--ff-cond);font-weight:600;font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:var(--fg-muted)">District Map · Town Margins</div>
+            <div style="font-family:var(--ff-body);font-size:11px;color:var(--fg-dim);margin-top:3px">${C.district_label} · ${recs.length} towns · click to inspect</div>
+          </div>
+          <div style="font-family:var(--ff-cond);font-weight:600;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--fg-dim)">D ◂ &nbsp;·&nbsp; ▸ R</div>
+        </div>
 
-    <div class="wpanel" style="grid-template-columns:1.5fr 1fr;margin-top:18px;align-items:stretch;">
-      <div class="tray">
-        <div class="tray-h"><span class="ttl">General-Election Turnout</span><span class="meta" style="color:var(--gold-lt);">’18 → ’24</span></div>
-        <div style="position:relative;margin-top:18px;"><svg viewBox="0 0 320 120" style="width:100%;height:auto;display:block;overflow:visible;">
-          <line x1="0" y1="104" x2="320" y2="104" stroke="rgba(255,255,255,.1)" stroke-width="1"></line>
-          <polyline points="${spPts.join(" ")}" fill="none" stroke="var(--teal-lt)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"></polyline>
-          ${spPts.map(p => { const [x, y] = p.split(","); return `<circle cx="${x}" cy="${y}" r="4" fill="var(--gold-lt)"></circle>`; }).join("")}
-        </svg></div>
-        <div style="display:flex;justify-content:space-between;margin-top:12px;">${yrs.map((y, i) => `<span class="meta" ${i === 3 ? 'style="color:var(--gold-lt);"' : ''}>’${String(y).slice(2)} · ${fmtK(gv[i])}</span>`).join("")}</div>
-      </div>
-      <div class="wpanel" style="grid-template-columns:1fr 1fr;gap:14px;align-content:start;">
-        ${miniStat("Active Reg.", fmt(T.active), "var(--fg)")}
-        ${miniStat(myYear + " Turnout", fmt(HMAIN.two), "var(--teal-lt)")}
-        ${miniStat("Win Number", fmt(win), "var(--gold-lt)")}
-        ${miniStat("Cleared vs Win", (myV - win >= 0 ? "+" : "−") + fmt(Math.abs(myV - win)), myV - win >= 0 ? "var(--teal-lt)" : "var(--rep-lt)")}
-      </div>
-    </div>
+        <div style="flex:1;position:relative;border:1px solid var(--border);border-radius:8px;background:#0C1A2E;overflow:hidden;min-height:480px">
+          <div id="v-map" style="position:absolute;inset:0"></div>
+          <div style="position:absolute;top:16px;left:16px;z-index:500;display:flex;align-items:center;gap:11px;padding:9px 15px;border-radius:6px;background:rgba(196,42,42,.15);border:1px solid rgba(196,42,42,.42)">
+            <span style="font-family:var(--ff-cond);font-weight:700;font-size:15px;letter-spacing:1px;text-transform:uppercase;color:#F87171">▲ R Holds</span>
+            <span style="width:1px;height:16px;background:rgba(255,255,255,.2)"></span>
+            <span style="font-family:var(--ff-cond);font-weight:700;font-size:16px;color:var(--fg);font-variant-numeric:tabular-nums">${leanLabelReg(HMAIN.margin)}</span>
+          </div>
+          ${targetN ? `<div style="position:absolute;top:16px;right:16px;z-index:500;display:flex;align-items:center;gap:8px;padding:7px 13px;border-radius:6px;background:rgba(12,26,46,.72);border:1px solid var(--border);backdrop-filter:blur(6px)"><span style="color:var(--gold);font-size:12px">◎</span><span style="font-family:var(--ff-cond);font-weight:600;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--gold-lt)">${targetN} Target Town${targetN > 1 ? "s" : ""}</span></div>` : ""}
+          <div style="position:absolute;left:16px;bottom:16px;z-index:500;padding:13px 15px;border-radius:8px;background:rgba(6,17,31,.74);border:1px solid var(--border-strong);backdrop-filter:blur(8px)">
+            <div style="font-family:var(--ff-cond);font-weight:600;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--fg-muted);margin-bottom:9px">Town Margin</div>
+            <div style="display:flex;flex-direction:column;gap:6px;font-family:var(--ff-body);font-size:11px;color:var(--fg-dim)">
+              ${[["#1D4ED8", "Safe D"], ["#5B8DEF", "Lean D"], ["#5B6B7E", "Toss-Up"], ["#E5564F", "Lean R"], ["#C42A2A", "Safe R"]].map(([c, l]) => `<div style="display:flex;align-items:center;gap:9px"><span style="width:22px;height:10px;border-radius:2px;background:${c}"></span>${l}</div>`).join("")}
+            </div>
+          </div>
+        </div>
+      </section>
 
-    <div class="tray" style="margin-top:18px;">
-      <div class="tray-h"><span class="ttl">Cycle Margins</span><span class="meta">R ◂ ▸ D · P = President · H = State House</span></div>
-      <div class="cyc-row">${cycCells}</div>
+      <!-- RIGHT RAIL: selected town + turnout + reg + cycle margins -->
+      <aside style="background:var(--navy-mid);border:1px solid var(--border);border-radius:8px;display:flex;flex-direction:column;overflow:hidden">
+        <div id="v-sel" style="padding:20px 22px;border-bottom:1px solid var(--border)"></div>
+        <div style="padding:20px 22px;border-bottom:1px solid var(--border)">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><div style="font-family:var(--ff-cond);font-weight:600;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--fg-muted)">General-Election Turnout</div><div style="font-family:var(--ff-cond);font-weight:600;font-size:10px;letter-spacing:1px;color:var(--fg-dim)">’18 → ’24</div></div>
+          <svg viewBox="0 0 284 90" style="width:100%;height:96px;display:block;margin-top:10px" preserveAspectRatio="none">
+            <line x1="10" y1="78" x2="274" y2="78" stroke="rgba(255,255,255,.08)" stroke-width="1"></line>
+            <polyline points="${spPts}" fill="none" stroke="var(--teal-lt)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"></polyline>${spDots}
+          </svg>
+          <div style="display:flex;justify-content:space-between;margin-top:6px">${yrs.map((y, i) => `<div style="text-align:center;font-family:var(--ff-cond);font-weight:600;font-size:11px;color:${i === 3 ? "var(--gold-lt)" : "var(--fg-dim)"}">’${String(y).slice(2)}<span style="display:block;font-family:var(--ff-body);font-weight:400;font-size:10px;color:var(--fg-muted);margin-top:2px">${fmtK(gv[i])}</span></div>`).join("")}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border-bottom:1px solid var(--border)">
+          <div style="background:var(--navy-mid);padding:16px 20px"><div style="font-family:var(--ff-cond);font-weight:600;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--fg-muted)">Active Reg.</div><div style="font-family:var(--ff-cond);font-weight:700;font-size:26px;line-height:1;color:var(--fg);margin-top:6px;font-variant-numeric:tabular-nums">${fmt(T.active)}</div></div>
+          <div style="background:var(--navy-mid);padding:16px 20px"><div style="font-family:var(--ff-cond);font-weight:600;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--fg-muted)">${myYear} Turnout</div><div style="font-family:var(--ff-cond);font-weight:700;font-size:26px;line-height:1;color:var(--teal-lt);margin-top:6px;font-variant-numeric:tabular-nums">${fmt(HMAIN.two)}</div></div>
+        </div>
+        <div style="padding:20px 22px;flex:1">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px"><div style="font-family:var(--ff-cond);font-weight:600;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--fg-muted)">Cycle Margins</div><div style="font-family:var(--ff-body);font-size:9px;letter-spacing:.5px;color:var(--fg-dim)">P · President&nbsp;&nbsp;H · House</div></div>
+          <div style="display:flex;flex-direction:column;gap:13px">${cycRows}</div>
+        </div>
+      </aside>
     </div>`;
 
-  // bars grow from 0
-  view.querySelectorAll(".usplit > div").forEach(d => {
-    const t = d.style.flex; d.style.flex = "0.0001"; requestAnimationFrame(() => { d.style.flex = t; });
-  });
+  function paintSel() {
+    const s = byName[verdictSel]; if (!s) return;
+    const tone = vTone(s.margin);
+    $("#v-sel").innerHTML = `
+      <div style="font-family:var(--ff-cond);font-weight:600;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--fg-muted)">Selected Town</div>
+      <div style="display:flex;align-items:center;gap:12px;margin-top:10px">
+        <span style="width:15px;height:15px;border-radius:3px;flex-shrink:0;background:${vColor(s.margin)}"></span>
+        <span style="font-family:var(--ff-display);font-weight:900;font-size:26px;line-height:1;color:var(--fg)">${s.name}</span>
+        <span style="padding:4px 11px;border-radius:3px;background:${tone.tint};border:1px solid ${tone.bd};font-family:var(--ff-cond);font-weight:600;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:${tone.txt}">${vLabel(s.margin)}</span>
+      </div>
+      <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:10px"><span style="width:16px;font-family:var(--ff-cond);font-weight:700;font-size:12px;color:#60A5FA">D</span><div style="flex:1;height:10px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden"><div style="height:100%;width:${s.dPct}%;background:#3B82F6;border-radius:3px"></div></div><span style="width:40px;text-align:right;font-family:var(--ff-cond);font-weight:700;font-size:13px;color:#60A5FA;font-variant-numeric:tabular-nums">${pc1(s.dPct)}</span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span style="width:16px;font-family:var(--ff-cond);font-weight:700;font-size:12px;color:#F87171">R</span><div style="flex:1;height:10px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden"><div style="height:100%;width:${s.rPct}%;background:#DC2626;border-radius:3px"></div></div><span style="width:40px;text-align:right;font-family:var(--ff-cond);font-weight:700;font-size:13px;color:#F87171;font-variant-numeric:tabular-nums">${pc1(s.rPct)}</span></div>
+      </div>
+      <div style="margin-top:15px;display:flex;justify-content:space-between;align-items:baseline;padding-top:13px;border-top:1px solid var(--hairline)"><span style="font-family:var(--ff-cond);font-weight:600;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--fg-muted)">Active Reg.</span><span style="font-family:var(--ff-cond);font-weight:700;font-size:18px;color:var(--fg);font-variant-numeric:tabular-nums">${fmt(s.reg)}</span></div>
+      ${s.target ? `<div style="margin-top:13px;display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:3px;background:rgba(212,160,23,.13);border:1px solid rgba(212,160,23,.32);font-family:var(--ff-cond);font-weight:600;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--gold-lt)">◎ Persuasion Target</div>` : ""}`;
+  }
+  paintSel();
+  setTimeout(() => verdictMap(recs, byName, () => paintSel()), 30);
 };
+
+/* real 4-town district map, colored by 2024 House margin, click to select */
+function verdictMap(recs, byName, onPick) {
+  const host = document.getElementById("v-map");
+  if (!host || !GEO || !GEO.towns) return;
+  const map = L.map("v-map", { scrollWheelZoom: false, zoomControl: false, attributionControl: false,
+    dragging: false, doubleClickZoom: false, boxZoom: false, keyboard: false, touchZoom: false });
+  const styleFor = f => { const r = byName[f.properties.town]; const sel = f.properties.town === verdictSel;
+    return { fillColor: r ? vColor(r.margin) : "#25313f", fillOpacity: .94, color: sel ? "#F0B82A" : "rgba(255,255,255,.18)", weight: sel ? 2.5 : 1 }; };
+  const layer = L.geoJSON(GEO.towns, {
+    style: styleFor,
+    onEachFeature: (f, lyr) => {
+      const name = f.properties.town; const r = byName[name]; if (!r) return;
+      lyr.on({
+        click: () => { verdictSel = name; layer.setStyle(styleFor); onPick(); },
+        mouseover: e => { if (name !== verdictSel) e.target.setStyle({ color: "rgba(255,255,255,.55)", weight: 1.5 }); },
+        mouseout: () => layer.setStyle(styleFor),
+      });
+    }
+  }).addTo(map);
+  map.fitBounds(layer.getBounds(), { padding: [34, 34] });
+  (window._maps = window._maps || []).push(map);
+  // permanent town labels: name + margin
+  GEO.towns.features.forEach(f => {
+    const name = f.properties.town, r = byName[name]; if (!r) return;
+    const sub = layer.getLayers().filter(l => l.feature.properties.town === name);
+    if (!sub.length) return;
+    const c = sub[0].getBounds().getCenter();
+    L.tooltip({ permanent: true, direction: "center", className: "v-town-lbl", opacity: 1 })
+      .setLatLng(c)
+      .setContent(`<div style="text-align:center;pointer-events:none;text-shadow:0 2px 10px rgba(0,0,0,.7)"><div style="font-family:var(--ff-display);font-weight:800;font-size:16px;letter-spacing:1px;text-transform:uppercase;color:#fff;line-height:1">${name}</div><div style="font-family:var(--ff-cond);font-weight:700;font-size:13px;color:rgba(255,255,255,.85);margin-top:2px">${leanLabelReg(r.margin)}</div></div>`)
+      .addTo(map);
+  });
+}
 
 /* ───────────────── ANALYSIS ───────────────── */
 let analysisMetric = "persuasion_share";
