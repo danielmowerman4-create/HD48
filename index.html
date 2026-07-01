@@ -26,7 +26,7 @@
   --bar-d:#3A6AB8; --bar-r:#E05555; --bar-n:#5A6E80;
   --map-safe-d:#1A3A8C; --map-lean-d:#3A6AB8; --map-tossup:#5A6E80; --map-lean-r:#E05555; --map-safe-r:#CC2222;
   /* status */
-  --good:#34D399; --warn:#F0B82A; --bad:#F87171; --violet:#A78BFA;
+  --good:#54B9AE; --warn:#F0B82A; --bad:#F87171; --violet:#9DB4CC;
   /* borders */
   --border:rgba(255,255,255,.07); --border-strong:rgba(255,255,255,.15);
   /* type */
@@ -200,10 +200,10 @@ td .nm,td.nm{font-family:var(--ff-display);font-weight:700;font-size:15px;letter
   transition:background var(--d-fast),border-color var(--d-fast)}
 a.chip:hover{background:rgba(34,170,188,.12);border-color:rgba(34,170,188,.3);color:var(--teal-lt)}
 .chip.solid{background:var(--camp);color:#06111F;border-color:var(--camp)}
-.tag-Protect,.tag-Build.base,.tag-Build{background:rgba(52,211,153,.12);color:#34D399;border-color:rgba(52,211,153,.3)}
+.tag-Protect,.tag-Build.base,.tag-Build{background:rgba(101,200,207,.12);color:var(--teal-lt);border-color:rgba(101,200,207,.32)}
 .tag-Turnout.opportunity{background:rgba(240,184,42,.12);color:var(--gold-lt);border-color:rgba(240,184,42,.3)}
 .tag-Persuasion.opportunity{background:rgba(34,170,188,.12);color:var(--teal-lt);border-color:rgba(34,170,188,.3)}
-.tag-Field-development.opportunity,.tag-Hold.the.line{background:rgba(167,139,250,.12);color:#A78BFA;border-color:rgba(167,139,250,.3)}
+.tag-Field-development.opportunity,.tag-Hold.the.line{background:rgba(157,180,204,.14);color:var(--npa-lt);border-color:rgba(157,180,204,.34)}
 .tag-Long.shot,.tag-Data-gap.area{background:rgba(248,113,113,.12);color:var(--rep-lt);border-color:rgba(248,113,113,.3)}
 
 /* badge (walk-list summary) */
@@ -368,7 +368,7 @@ canvas{max-width:100%}
   --navy:#111820; --navy-deep:#080B10; --navy-mid:#161E27; --navy-card:#1B2530; --navy-tile:#111820; --navy-panel:#222C37;
   --fg:#F6F2EA; --fg-muted:#9BA8B5; --fg-dim:#6D7885;
   --teal:#247B83; --teal-lt:#65C8CF; --gold:#C69438; --gold-lt:#E7C772;
-  --npa:#6C5DD3; --npa-lt:#B5A7FF;
+  --npa:#5B7593; --npa-lt:#9DB4CC;
   --bar-d:#426EAA; --bar-r:#B84A42; --bar-n:#758190;
   --safe-d:#1A3A8C; --likely-d:#3A6AB8; --tossup:#5A6E80; --likely-r:#E05555; --safe-r:#CC2222;
   --border:rgba(246,242,234,.08); --border-strong:rgba(246,242,234,.16); --border-lt:rgba(246,242,234,.18); --hairline:rgba(246,242,234,.045);
@@ -493,7 +493,7 @@ tbody td{color:var(--fg);border-bottom-color:rgba(246,242,234,.06)}
   --fg:#EEF3FB; --fg-muted:#6B87A3; --fg-dim:#3D5268;
   --teal:#1A8B9A; --teal-lt:#22AABC;
   --gold:#D4A017; --gold-lt:#F0B82A;
-  --npa:#7C3AED; --npa-lt:#9B6BF0;
+  --npa:#5B7593; --npa-lt:#9DB4CC;
   --dem:#2563EB; --dem-lt:#60A5FA; --rep:#DC2626; --rep-lt:#F87171;
   --bar-d:#3A6AB8; --bar-r:#E05555; --bar-n:#5A6E80;
   --border:rgba(255,255,255,.07); --border-strong:rgba(255,255,255,.14); --hairline:rgba(255,255,255,.07);
@@ -666,6 +666,6 @@ body{background:var(--navy)!important;background-attachment:fixed}
 <script src="data/health.js?v=10"></script>
 <script src="data/geometry.js?v=10"></script>
 <script src="data/targets.js?v=14"></script>
-<script src="app.js?v=24"></script>
+<script src="app.js?v=25"></script>
 </body>
 </html>

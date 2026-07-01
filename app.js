@@ -344,11 +344,11 @@ ROUTES.turnout = function (view) {
   const row2 = el("div", "grid"); row2.style.gridTemplateColumns = "1fr 1fr"; row2.style.marginTop = "22px";
   const tc = el("div", "card pad");
   tc.appendChild(el("p", "section-title", "Turnout tiers<span class='ln'></span>"));
-  chart(tc, doughnut(TIERS.map(t => T.tier[t]), TIERS, ["#34D399", "#1A8B9A", "#F0B82A", "#5A6E80"]), 200);
+  chart(tc, doughnut(TIERS.map(t => T.tier[t]), TIERS, ["#65C8CF", "#2E8892", "#E7C772", "#5B7593"]), 200);
   const mc = el("div", "card pad");
   mc.appendChild(el("p", "section-title", "Vote-method tendency<span class='ln'></span>"));
   chart(mc, doughnut(METHODS.map(m => T.method[m]), ["Early", "Absentee", "Election Day", "Mixed", "Unknown"],
-    ["#3A6AB8", "#60A5FA", "#E05555", "#F0B82A", "#5A6E80"]), 200);
+    ["#65C8CF", "#2E8892", "#E7C772", "#9DB4CC", "#4A5A6B"]), 200);
   row2.appendChild(tc); row2.appendChild(mc);
   view.appendChild(row2);
 };
@@ -559,7 +559,7 @@ function chipFor(cls) { const c = cls.toLowerCase();
 function chipStyle(type) {
   const map = { GOTV: ["var(--teal-lt)", "rgba(26,139,154,.14)", "rgba(26,139,154,.34)"],
     PERSUADE: ["var(--gold-lt)", "rgba(212,160,23,.14)", "rgba(212,160,23,.34)"],
-    EXPAND: ["var(--npa-lt)", "rgba(124,58,237,.16)", "rgba(124,58,237,.36)"],
+    EXPAND: ["var(--npa-lt)", "rgba(91,117,147,.16)", "rgba(91,117,147,.36)"],
     HOLD: ["var(--rep-lt)", "rgba(220,38,38,.12)", "rgba(220,38,38,.3)"] };
   const c = map[type] || map.HOLD;
   return `display:inline-block;font-family:var(--ff-cond);font-weight:600;font-size:10px;letter-spacing:1px;padding:2px 7px;border-radius:2px;color:${c[0]};background:${c[1]};border:1px solid ${c[2]};`;
@@ -703,8 +703,8 @@ let analysisMetric = "persuasion_share";
 let analysisTown = null;
 const METRIC_SHORT = { persuasion_share: "Persuasion load", true_swing_rate: "True swing", base_lean_rate: "Base + lean", outdoor_l2_rate: "Outdoor / gun L2", election_day_rate: "Election Day" };
 const METRIC_STYLE = {
-  persuasion_share:  { rgb: [124, 58, 237],  hex: "#A78BFA", legend: "Share of persuasion core" },
-  true_swing_rate:   { rgb: [167, 139, 250], hex: "#C4B5FD", legend: "Convertible swing rate" },
+  persuasion_share:  { rgb: [91, 117, 147],  hex: "#9DB4CC", legend: "Share of persuasion core" },
+  true_swing_rate:   { rgb: [125, 148, 173], hex: "#B7C6D8", legend: "Convertible swing rate" },
   base_lean_rate:    { rgb: [26, 139, 154],  hex: "#22AABC", legend: "Base & lean to protect" },
   outdoor_l2_rate:   { rgb: [212, 160, 23],  hex: "#F0B82A", legend: "Outdoor / gun L2 cluster" },
   election_day_rate: { rgb: [34, 170, 188],  hex: "#22AABC", legend: "Election Day load" },
@@ -787,7 +787,7 @@ ROUTES.analysis = function (view) {
     const swing = t.true_swing > 500;
     const tj = swing ? "Persuasion" : "Base / lean";
     const pillStyle = swing
-      ? "color:var(--npa-lt);background:rgba(124,58,237,.14);border:1px solid rgba(124,58,237,.32);"
+      ? "color:var(--npa-lt);background:rgba(91,117,147,.14);border:1px solid rgba(91,117,147,.32);"
       : "color:var(--teal-lt);background:rgba(26,139,154,.14);border:1px solid rgba(26,139,154,.32);";
     const sel = t.town === analysisTown;
     return `<tr class="click${sel ? " sel" : ""}" data-atown="${t.town}"><td class="nm">${t.town}</td><td><span class="pill" style="${pillStyle}">${tj}</span></td><td class="num">${fmt(t.targets)}</td><td class="num" style="color:var(--gold-lt);">${pc1(t.target_share)}</td><td class="num">${fmt(t.persuasion)}</td><td class="num">${fmt(t.true_swing)}</td><td class="num">${fmt(t.base_gotv + t.lean_support)}</td><td class="num" style="color:var(--dem-lt);">${fmt(t.weak_dem)}</td></tr>`;
@@ -1139,7 +1139,7 @@ ROUTES.battlefield = function (view) {
     </div>
 
     <div class="vrow" style="grid-template-columns:repeat(3,1fr);margin-top:14px;">
-      <div style="background:linear-gradient(160deg,rgba(124,58,237,.14),rgba(15,33,64,.35));border:1px solid rgba(124,58,237,.3);border-radius:var(--r-lg);padding:16px 18px;">
+      <div style="background:linear-gradient(160deg,rgba(91,117,147,.14),rgba(15,33,64,.35));border:1px solid rgba(91,117,147,.3);border-radius:var(--r-lg);padding:16px 18px;">
         <div style="display:flex;justify-content:space-between;align-items:baseline;"><span class="kicker" style="color:var(--npa-lt);">Persuasion Universe</span><span class="tag" style="color:var(--npa-lt);">Lead</span></div>
         <div class="num" style="font-size:38px;line-height:1;margin-top:4px;">${fmt(T.party.Unaffiliated)}</div>
         <div style="height:8px;border-radius:4px;background:var(--npa);margin-top:10px;"></div></div>
@@ -1172,7 +1172,7 @@ ROUTES.plan = function (view) {
   const alloc = [["Field", 38, "var(--teal)", "var(--teal-lt)"], ["Mail", 27, "var(--gold)", "var(--gold-lt)"], ["Digital", 22, "var(--npa)", "var(--npa-lt)"], ["Data", 13, "var(--fg-muted)", "var(--fg-dim)"]];
   let off = 0; const arcs = alloc.map(([, pc, col]) => { const len = pc / 100 * C0; const s = `<circle cx="50" cy="50" r="42" fill="none" stroke="${col}" stroke-width="15" stroke-dasharray="${len.toFixed(1)} ${C0}" stroke-dashoffset="${(-off).toFixed(1)}"></circle>`; off += len; return s; }).join("");
   const legend = alloc.map(([lab, pc, col, lt]) => `<div style="display:flex;align-items:center;gap:9px;"><span style="width:10px;height:10px;border-radius:2px;background:${col};"></span><span class="tag" style="flex:1;color:var(--fg);">${lab}</span><span class="num" style="color:${lt};">${pc}%</span></div>`).join("");
-  const phases = [["WK 18–12", "Register & Expand", "212,160,23", "var(--gold-lt)"], ["WK 12–5", "Persuade The Swing", "124,58,237", "var(--npa-lt)"], ["WK 5–1", "Bank Early Vote", "26,139,154", "var(--teal-lt)"], ["FINAL WK", "GOTV — Drive The Universe", "220,38,38", "var(--rep-lt)"]];
+  const phases = [["WK 18–12", "Register & Expand", "212,160,23", "var(--gold-lt)"], ["WK 12–5", "Persuade The Swing", "91,117,147", "var(--npa-lt)"], ["WK 5–1", "Bank Early Vote", "26,139,154", "var(--teal-lt)"], ["FINAL WK", "GOTV — Drive The Universe", "220,38,38", "var(--rep-lt)"]];
   const timeline = phases.map(([wk, lab, rgb, c]) => `<div style="display:flex;align-items:center;gap:10px;"><span class="num" style="width:66px;flex-shrink:0;font-size:11px;color:var(--fg-muted);">${wk}</span><div class="tag" style="flex:1;height:26px;border-radius:var(--r-sm);background:rgba(${rgb},.16);border:1px solid rgba(${rgb},.32);display:flex;align-items:center;padding:0 12px;color:${c};">${lab}</div></div>`).join("");
   const pillars = [
     ["Pillar 01", "var(--npa-lt)", "Persuasion First", "+" + fmt(dec), "2024 margin to defend", "var(--npa)"],
