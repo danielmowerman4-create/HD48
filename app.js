@@ -376,79 +376,96 @@ const marginLabel = m => (m >= 0 ? "D+" : "R+") + Math.abs(m).toFixed(1);
 function colorForMargin(m) { // m = D − R, two-party points
   if (m > 15) return "#1A3A8C"; if (m > 5) return "#3A6AB8"; if (m > -5) return "#5A6E80"; if (m > -15) return "#E05555"; return "#CC2222";
 }
+const pcol = p => p === "D" ? "var(--dem-lt)" : p === "R" ? "var(--rep-lt)" : "var(--gold-lt)";
+const pbar = p => p === "D" ? "var(--bar-d)" : p === "R" ? "var(--bar-r)" : "var(--npa)";
 ROUTES.results = function (view) {
   if (!RES) { view.innerHTML = vhead("Certified Returns", "var(--teal-lt)", "Results", "") + `<div class="note"><div>Results data not loaded.</div></div>`; return; }
   if (!RES.races[resRace]) resRace = RES.order[0];
   const race = RES.races[resRace];
-  const tot = resTotals(race);
-  const prev = RES.compare[resRace] ? RES.races[RES.compare[resRace]] : null;
-  const prevTot = prev ? resTotals(prev) : null;
-  const win = tot.r >= tot.d ? "r" : "d";
-  const winName = win === "r" ? race.rep.name : race.dem.name;
-  const winColor = win === "r" ? "var(--rep-lt)" : "var(--dem-lt)";
-  const winBg = win === "r" ? "rgba(220,38,38,.12)" : "rgba(37,99,235,.14)";
-  const winBorder = win === "r" ? "rgba(220,38,38,.4)" : "rgba(37,99,235,.4)";
-  const swingTxt = prevTot ? (() => { const dm = tot.margin - prevTot.margin; return `swing ${dm >= 0 ? "D" : "R"}+${Math.abs(dm).toFixed(1)} vs ${prev.year}`; })() : "first comparable cycle";
+  const municipal = !!race.municipal;
+  const splitTowns = race.splitTowns || [];
 
-  // race selector — grouped by office so it scales as races are added
-  const groups = {};
-  RES.order.forEach(k => { const o = RES.races[k].office; (groups[o] = groups[o] || []).push(k); });
-  const raceSel = Object.entries(groups).map(([office, keys]) =>
-    `<div class="seg">${keys.map(k => `<button class="seg-btn ${k === resRace ? "on" : ""}" data-k="${k}">${RES.races[k].label}</button>`).join("")}</div>`).join("");
+  // grouped race selector (President / Governor / State House / First Selectman)
+  const raceSel = RES.groups.map(gp => `<div style="display:flex;flex-direction:column;gap:6px;">
+    <span class="rlabel" style="font-size:8px;color:var(--fg-dim);">${gp.office}</span>
+    <div class="seg">${gp.keys.map(k => `<button class="seg-btn ${k === resRace ? "on" : ""}" data-k="${k}">${RES.races[k].year}</button>`).join("")}</div>
+  </div>`).join("");
 
-  // turnout history
+  // turnout history (shared)
   const g = C.gen_years || {}; const years = [2018, 2020, 2022, 2024];
   const maxTurnout = Math.max(...years.map(y => g[y] || 0)) || 1;
   const turnoutCards = years.map(y => {
     const v = g[y] || 0, mid = y % 4 !== 0;
     const c = mid ? "var(--gold-lt)" : "var(--teal-lt)", bar = mid ? "var(--gold)" : "var(--teal)";
-    return `<div style="background:var(--navy-card);padding:16px 18px;">
-      <div class="rlabel">${y} ${mid ? "Midterm" : "Presidential"}</div>
-      <div class="r-num" style="font-size:28px;margin:8px 0 12px;color:${c};">${fmt(v)}</div>
-      <div style="height:6px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden;"><div style="height:100%;width:${Math.round(100 * v / maxTurnout)}%;background:${bar};border-radius:3px;"></div></div>
-    </div>`;
+    return `<div style="background:var(--navy-card);padding:16px 18px;"><div class="rlabel">${y} ${mid ? "Midterm" : "Presidential"}</div><div class="r-num" style="font-size:28px;margin:8px 0 12px;color:${c};">${fmt(v)}</div><div style="height:6px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden;"><div style="height:100%;width:${Math.round(100 * v / maxTurnout)}%;background:${bar};border-radius:3px;"></div></div></div>`;
   }).join("");
 
-  // town result + swing rows
-  const townRows = RES.towns.map(tn => {
-    const t = race.towns[tn]; const two = t.d + t.r; const mm = 100 * (t.d - t.r) / two;
-    const mc = mm >= 0 ? "var(--dem-lt)" : "var(--rep-lt)";
-    let sw = "";
-    if (prev && prev.towns[tn]) { const p = prev.towns[tn]; const pm = 100 * (p.d - p.r) / (p.d + p.r); const dm = mm - pm;
-      sw = `<span class="r-num" style="font-size:12px;color:${dm >= 0 ? "var(--dem-lt)" : "var(--rep-lt)"};">${dm >= 0 ? "▲ D" : "▼ R"}+${Math.abs(dm).toFixed(1)}</span>`; }
-    return `<div style="border:1px solid var(--border);background:rgba(15,26,44,.4);border-radius:8px;padding:13px 14px;margin-bottom:10px;">
-      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:9px;"><span class="r-num" style="font-size:16px;color:var(--fg);">${tn}</span><span style="display:flex;align-items:baseline;gap:10px;"><span class="r-num" style="font-size:14px;color:${mc};">${marginLabel(mm)}</span>${sw}</span></div>
-      <div style="display:flex;height:26px;border-radius:4px;overflow:hidden;"><div style="width:${100 * t.d / two}%;background:var(--bar-d);display:flex;align-items:center;padding-left:10px;min-width:0;"><span class="r-num" style="font-size:12px;color:#fff;">${fmt(t.d)}</span></div><div style="width:${100 * t.r / two}%;background:var(--bar-r);display:flex;align-items:center;justify-content:flex-end;padding-right:10px;min-width:0;"><span class="r-num" style="font-size:12px;color:#fff;">${fmt(t.r)}</span></div></div>
+  let summary, townRows;
+  if (!municipal) {
+    // ── partisan: two-party summary + swing ──
+    const tot = resTotals(race);
+    const prev = RES.compare[resRace] ? RES.races[RES.compare[resRace]] : null;
+    const prevTot = prev ? resTotals(prev) : null;
+    const win = tot.r >= tot.d ? "r" : "d";
+    const winName = win === "r" ? race.rep.name : race.dem.name;
+    const winColor = win === "r" ? "var(--rep-lt)" : "var(--dem-lt)";
+    const winBg = win === "r" ? "rgba(220,38,38,.12)" : "rgba(37,99,235,.14)";
+    const winBorder = win === "r" ? "rgba(220,38,38,.4)" : "rgba(37,99,235,.4)";
+    const swingTxt = prevTot ? (() => { const dm = tot.margin - prevTot.margin; return `swing ${dm >= 0 ? "D" : "R"}+${Math.abs(dm).toFixed(1)} vs ${prev.year}`; })() : "first comparable cycle";
+    summary = `<div class="rsum-grid" style="display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr;gap:24px;align-items:center;">
+      <div><div class="rlabel" style="margin-bottom:12px;">${race.office}</div><div style="display:inline-flex;align-items:center;gap:8px;background:${winBg};border:1px solid ${winBorder};border-radius:4px;padding:9px 14px;"><span class="r-num" style="font-size:15px;letter-spacing:1px;text-transform:uppercase;color:${winColor};">${winName}</span><span style="color:${winColor};">✓</span></div><div style="font-family:var(--ff-body);font-size:12px;color:var(--fg-muted);margin-top:10px;">${race.scope}</div></div>
+      <div><div class="rlabel" style="color:var(--rep-lt);">${race.rep.name} (R)</div><div class="r-num" style="font-size:34px;line-height:1;color:var(--rep-lt);margin-top:6px;">${fmt(tot.r)}</div><div style="font-family:var(--ff-body);font-size:12px;color:var(--fg-muted);margin-top:6px;">${pc1(tot.rPct)}</div></div>
+      <div><div class="rlabel" style="color:var(--dem-lt);">${race.dem.name} (D)</div><div class="r-num" style="font-size:34px;line-height:1;color:var(--dem-lt);margin-top:6px;">${fmt(tot.d)}</div><div style="font-family:var(--ff-body);font-size:12px;color:var(--fg-muted);margin-top:6px;">${pc1(tot.dPct)}</div></div>
+      <div><div class="rlabel">Margin</div><div class="r-num" style="font-size:34px;line-height:1;color:${winColor};margin-top:6px;">${marginLabel(tot.margin)}</div><div style="font-family:var(--ff-body);font-size:12px;color:var(--fg-muted);margin-top:6px;">${swingTxt}</div></div>
     </div>`;
-  }).join("");
+    townRows = RES.towns.map(tn => {
+      const t = race.towns[tn]; if (!t) return "";
+      const two = t.d + t.r; const mm = 100 * (t.d - t.r) / two; const mc = mm >= 0 ? "var(--dem-lt)" : "var(--rep-lt)";
+      const isSplit = splitTowns.indexOf(tn) >= 0;
+      let sw = "";
+      if (prev && prev.towns[tn]) { const p = prev.towns[tn]; const pm = 100 * (p.d - p.r) / (p.d + p.r); const dm = mm - pm;
+        sw = `<span class="r-num" style="font-size:12px;color:${dm >= 0 ? "var(--dem-lt)" : "var(--rep-lt)"};">${dm >= 0 ? "▲ D" : "▼ R"}+${Math.abs(dm).toFixed(1)}</span>`; }
+      return `<div style="border:1px solid var(--border);background:rgba(15,26,44,.4);border-radius:8px;padding:13px 14px;margin-bottom:10px;">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:9px;"><span class="r-num" style="font-size:16px;color:var(--fg);">${tn}${isSplit ? ` <span class="rlabel" style="font-size:8px;color:var(--gold-lt);">· HD-48 split</span>` : ""}</span><span style="display:flex;align-items:baseline;gap:10px;"><span class="r-num" style="font-size:14px;color:${mc};">${marginLabel(mm)}</span>${sw}</span></div>
+        <div style="display:flex;height:26px;border-radius:4px;overflow:hidden;"><div style="width:${100 * t.d / two}%;background:var(--bar-d);display:flex;align-items:center;padding-left:10px;min-width:0;"><span class="r-num" style="font-size:12px;color:#fff;">${fmt(t.d)}</span></div><div style="width:${100 * t.r / two}%;background:var(--bar-r);display:flex;align-items:center;justify-content:flex-end;padding-right:10px;min-width:0;"><span class="r-num" style="font-size:12px;color:#fff;">${fmt(t.r)}</span></div></div>
+      </div>`;
+    }).join("");
+  } else {
+    // ── municipal: each town runs its own First Selectman race ──
+    const holds = {};
+    RES.towns.forEach(tn => { const t = race.towns[tn]; if (t) holds[t.a.p] = (holds[t.a.p] || 0) + 1; });
+    const holdTxt = Object.entries(holds).map(([p, n]) => `${n} ${p}`).join(" · ");
+    const chips = RES.towns.map(tn => { const t = race.towns[tn];
+      if (!t) return `<div style="display:flex;align-items:center;gap:8px;"><span style="width:9px;height:9px;border-radius:2px;background:var(--fg-dim);flex-shrink:0;"></span><span class="r-num" style="font-size:13px;color:var(--fg-muted);">${tn}: no race</span></div>`;
+      return `<div style="display:flex;align-items:center;gap:8px;"><span style="width:9px;height:9px;border-radius:2px;background:${pbar(t.a.p)};flex-shrink:0;"></span><span class="r-num" style="font-size:13px;color:var(--fg);">${tn}: ${t.a.n}</span><span class="rlabel" style="font-size:8px;color:${pcol(t.a.p)};">${t.a.p}</span></div>`;
+    }).join("");
+    summary = `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:24px;flex-wrap:wrap;">
+      <div><div class="rlabel" style="margin-bottom:10px;">First Selectman · ${race.year}</div><div style="font-family:var(--ff-body);font-size:12px;color:var(--fg-muted);max-width:46ch;line-height:1.55;">Municipal offices — each town elects its own First Selectman.${holdTxt ? " Winners: " + holdTxt + "." : ""}</div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 22px;">${chips}</div>
+    </div>`;
+    townRows = RES.towns.map(tn => { const t = race.towns[tn];
+      if (!t) return `<div style="border:1px solid var(--border);background:rgba(15,26,44,.4);border-radius:8px;padding:13px 14px;margin-bottom:10px;"><div style="display:flex;align-items:baseline;justify-content:space-between;"><span class="r-num" style="font-size:16px;color:var(--fg);">${tn}</span><span class="rlabel" style="color:var(--fg-dim);">no race this cycle</span></div></div>`;
+      const a = t.a, b = t.b; const two = (a.v + b.v) || 1; const mar = 100 * (a.v - b.v) / two; const uno = b.v === 0;
+      return `<div style="border:1px solid var(--border);background:rgba(15,26,44,.4);border-radius:8px;padding:13px 14px;margin-bottom:10px;">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:9px;"><span class="r-num" style="font-size:16px;color:var(--fg);">${tn}</span><span class="r-num" style="font-size:13px;color:${pcol(a.p)};">${a.n} (${a.p}) ${uno ? "unopp." : "+" + Math.abs(mar).toFixed(1)}</span></div>
+        <div style="display:flex;height:26px;border-radius:4px;overflow:hidden;background:#0F1A2C;"><div style="width:${100 * a.v / two}%;background:${pbar(a.p)};display:flex;align-items:center;padding-left:10px;min-width:0;"><span class="r-num" style="font-size:12px;color:#fff;">${a.n} ${fmt(a.v)}</span></div>${uno ? "" : `<div style="width:${100 * b.v / two}%;background:${pbar(b.p)};display:flex;align-items:center;justify-content:flex-end;padding-right:10px;min-width:0;"><span class="r-num" style="font-size:12px;color:#fff;">${fmt(b.v)} ${b.n}</span></div>`}</div>
+      </div>`;
+    }).join("");
+  }
 
   view.innerHTML =
     vhead("Certified Returns", "var(--teal-lt)", "Results", RES.note || "CT SOTS") +
-    `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">${raceSel}</div>
-
-    <div class="vcard" style="padding:22px 26px;margin-bottom:16px;">
-      <div class="rsum-grid" style="display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr;gap:24px;align-items:center;">
-        <div>
-          <div class="rlabel" style="margin-bottom:12px;">${race.office}</div>
-          <div style="display:inline-flex;align-items:center;gap:8px;background:${winBg};border:1px solid ${winBorder};border-radius:4px;padding:9px 14px;"><span class="r-num" style="font-size:15px;letter-spacing:1px;text-transform:uppercase;color:${winColor};">${winName}</span><span style="color:${winColor};">✓</span></div>
-          <div style="font-family:var(--ff-body);font-size:12px;color:var(--fg-muted);margin-top:10px;">${race.scope}</div>
-        </div>
-        <div><div class="rlabel" style="color:var(--rep-lt);">${race.rep.name.split(" ").pop()} (R)</div><div class="r-num" style="font-size:34px;line-height:1;color:var(--rep-lt);margin-top:6px;">${fmt(tot.r)}</div><div style="font-family:var(--ff-body);font-size:12px;color:var(--fg-muted);margin-top:6px;">${pc1(tot.rPct)}</div></div>
-        <div><div class="rlabel" style="color:var(--dem-lt);">${race.dem.name.split(" ").pop()} (D)</div><div class="r-num" style="font-size:34px;line-height:1;color:var(--dem-lt);margin-top:6px;">${fmt(tot.d)}</div><div style="font-family:var(--ff-body);font-size:12px;color:var(--fg-muted);margin-top:6px;">${pc1(tot.dPct)}</div></div>
-        <div><div class="rlabel">Margin</div><div class="r-num" style="font-size:34px;line-height:1;color:${winColor};margin-top:6px;">${marginLabel(tot.margin)}</div><div style="font-family:var(--ff-body);font-size:12px;color:var(--fg-muted);margin-top:6px;">${swingTxt}</div></div>
-      </div>
-    </div>
-
+    `<div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:16px;align-items:flex-end;">${raceSel}</div>
+    <div class="vcard" style="padding:22px 26px;margin-bottom:16px;">${summary}</div>
     <div class="wpanel cols-4" style="grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px;">${turnoutCards}</div>
-
     <div class="wpanel" style="grid-template-columns:1.55fr 1fr;gap:16px;align-items:start;">
       <div class="console-card">
-        <div style="padding:14px 18px 12px;"><span class="rlabel">Margin by Town</span></div>
+        <div style="padding:14px 18px 12px;"><span class="rlabel">${municipal ? "Winner by Town" : "Margin by Town"}</span></div>
         <div id="rmap" style="height:500px;border:0;border-radius:0;"></div>
         <div class="legend" id="rmap-legend" style="padding:14px 18px;border-top:1px solid var(--border);"></div>
       </div>
       <div class="vcard" style="padding:18px;">
-        <div class="rlabel" style="margin-bottom:14px;">Town Result &amp; Swing</div>
+        <div class="rlabel" style="margin-bottom:14px;">${municipal ? "Town Result" : "Town Result & Swing"}</div>
         ${townRows}
       </div>
     </div>`;
@@ -456,42 +473,32 @@ ROUTES.results = function (view) {
   view.querySelectorAll("[data-k]").forEach(b => b.onclick = () => { resRace = b.dataset.k; route(); });
   setTimeout(() => resultsMap("rmap", race, "rmap-legend"), 30);
 };
-function townResultRows(race, prev) {
-  const col = el("div", "col"); col.style.gap = "10px";
-  RES.towns.forEach(tn => {
-    const t = race.towns[tn]; const two = t.d + t.r; const m = 100 * (t.d - t.r) / two;
-    const lead = m >= 0 ? "d" : "r";
-    let swing = "";
-    if (prev && prev.towns[tn]) {
-      const p = prev.towns[tn]; const pm = 100 * (p.d - p.r) / (p.d + p.r); const dm = m - pm;
-      swing = `<span class="swing ${dm >= 0 ? "d" : "r"}">${dm >= 0 ? "▲ D" : "▼ R"}+${Math.abs(dm).toFixed(1)}</span>`;
-    }
-    const row = el("div", "tres");
-    row.innerHTML = `<div class="between"><span class="tres-nm">${tn}</span><span class="tres-m ${lead}">${marginLabel(m)}${swing}</span></div>
-      <div class="pbar"><div class="pbar-seg d" style="width:${100 * t.d / two}%"><b>${fmt(t.d)}</b></div><div class="pbar-seg r" style="width:${100 * t.r / two}%"><b>${fmt(t.r)}</b></div></div>`;
-    col.appendChild(row);
-  });
-  return col;
-}
-function resultsMap(id, race, legendId) {
+function resultsMap(id, race) {
+  const municipal = !!race.municipal;
+  const partyFill = p => p === "R" ? "#CC2222" : p === "D" ? "#1A3A8C" : "#7C3AED";
   const map = L.map(id, { scrollWheelZoom: false, attributionControl: false });
   L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png", { maxZoom: 18 }).addTo(map);
   L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png", { maxZoom: 18, pane: "markerPane" }).addTo(map);
-  map.fitBounds(GEO.bounds, { padding: [18, 18] });
+  map.fitBounds(GEO.bounds, { padding: [26, 26] });
   (window._maps = window._maps || []).push(map);
   const layer = L.geoJSON(GEO.towns, {
     style: f => { const t = race.towns[f.properties.town];
       if (!t) return { fillColor: "#0F1A2C", fillOpacity: .5, color: "#06111F", weight: 1 };
+      if (municipal) return { fillColor: partyFill(t.a.p), fillOpacity: .9, color: "#06111F", weight: 1.2 };
       const m = 100 * (t.d - t.r) / (t.d + t.r);
       return { fillColor: colorForMargin(m), fillOpacity: .9, color: "#06111F", weight: 1.2 }; },
     onEachFeature: (f, lyr) => { const t = race.towns[f.properties.town]; if (!t) return;
-      const m = 100 * (t.d - t.r) / (t.d + t.r);
-      lyr.bindTooltip(`<b>${f.properties.town}</b><br>${race.rep.name}: ${fmt(t.r)}<br>${race.dem.name}: ${fmt(t.d)}<br>${marginLabel(m)}`, { sticky: true });
-      lyr.on({ mouseover: e => e.target.setStyle({ weight: 3, color: "#22AABC" }), mouseout: e => layer.resetStyle(e.target) });
+      let tip;
+      if (municipal) { const a = t.a, b = t.b; tip = `<b>${f.properties.town}</b><br>${a.n} (${a.p}): ${fmt(a.v)}${b.v ? `<br>${b.n} (${b.p}): ${fmt(b.v)}` : " · unopposed"}`; }
+      else { const m = 100 * (t.d - t.r) / (t.d + t.r); tip = `<b>${f.properties.town}</b><br>${race.rep.name}: ${fmt(t.r)}<br>${race.dem.name}: ${fmt(t.d)}<br>${marginLabel(m)}`; }
+      lyr.bindTooltip(tip, { sticky: true });
+      lyr.on({ mouseover: e => e.target.setStyle({ weight: 3, color: "#F0B82A" }), mouseout: e => layer.resetStyle(e.target) });
     }
   }).addTo(map);
-  const lg = legendId && document.getElementById(legendId);
-  if (lg) lg.innerHTML = [["#1A3A8C", "Safe D"], ["#3A6AB8", "Lean D"], ["#5A6E80", "Even"], ["#E05555", "Lean R"], ["#CC2222", "Safe R"]]
+  const lg = document.getElementById("rmap-legend");
+  if (lg) lg.innerHTML = (municipal
+    ? [["#1A3A8C", "D win"], ["#CC2222", "R win"], ["#7C3AED", "Other"]]
+    : [["#1A3A8C", "Safe D"], ["#3A6AB8", "Lean D"], ["#5A6E80", "Even"], ["#E05555", "Lean R"], ["#CC2222", "Safe R"]])
     .map(([c, l]) => `<span><i style="background:${c}"></i>${l}</span>`).join("");
   return map;
 }
