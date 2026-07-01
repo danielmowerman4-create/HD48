@@ -170,6 +170,30 @@ td .nm,td.nm{font-family:var(--ff-display);font-weight:700;font-size:15px;letter
 .mini{height:5px;border-radius:3px;background:rgba(255,255,255,.06);overflow:hidden;min-width:60px;display:inline-block;vertical-align:middle}
 .mini>i{display:block;height:100%;background:var(--teal-lt)}
 
+/* ── elevated data tables (Targets / Analysis) ── */
+.tbl-wrap.pretty{border:1px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:var(--shadow-card)}
+.dtable{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
+.dtable thead th{position:sticky;top:0;z-index:2;background:linear-gradient(180deg,#102A40,#0B1D30);text-align:left;
+  font-family:var(--ff-display);font-weight:600;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--fg-muted);
+  padding:13px 16px;border-bottom:1px solid var(--border-strong);white-space:nowrap;transition:color var(--d-fast)}
+.dtable thead th.num{text-align:right}
+.dtable thead th:first-child{padding-left:20px}
+.dtable tbody td{padding:13px 16px;border-bottom:1px solid var(--border);font-variant-numeric:tabular-nums;color:var(--fg);white-space:nowrap}
+.dtable tbody td.num{text-align:right}
+.dtable tbody td:first-child{padding-left:20px}
+.dtable tbody tr:nth-child(even) td{background:rgba(255,255,255,.014)}
+.dtable tbody tr:last-child td{border-bottom:none}
+.dtable tbody tr.click{cursor:pointer}
+.dtable tbody tr{transition:background var(--d-fast)}
+.dtable tbody tr:hover td{background:rgba(34,170,188,.09)}
+.dtable tbody td:first-child{box-shadow:inset 3px 0 0 transparent;transition:box-shadow var(--d-fast)}
+.dtable tbody tr:hover td:first-child{box-shadow:inset 3px 0 0 var(--teal-lt)}
+.dtable tbody tr.sel td{background:rgba(34,170,188,.11)}
+.dtable tbody tr.sel td:first-child{box-shadow:inset 3px 0 0 var(--gold-lt)}
+.dtable td.nm{font-family:var(--ff-display);font-weight:700;font-size:15px;letter-spacing:.3px;color:var(--fg)}
+.dtable .pill{font-family:var(--ff-display);font-weight:600;font-size:10px;letter-spacing:.6px;text-transform:uppercase;
+  padding:3px 9px;border-radius:20px;white-space:nowrap}
+
 /* chips / classification tags */
 .chip{display:inline-flex;align-items:center;gap:5px;font-family:var(--ff-display);font-weight:600;font-size:11px;letter-spacing:1px;
   text-transform:uppercase;padding:4px 10px;border-radius:var(--r-chip);background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--fg-muted);
@@ -642,6 +666,6 @@ body{background:var(--navy)!important;background-attachment:fixed}
 <script src="data/health.js?v=10"></script>
 <script src="data/geometry.js?v=10"></script>
 <script src="data/targets.js?v=14"></script>
-<script src="app.js?v=23"></script>
+<script src="app.js?v=24"></script>
 </body>
 </html>
