@@ -1067,12 +1067,13 @@ ROUTES.targets = function (view) {
     <div class="vcard" style="padding:20px 22px;margin-bottom:16px;">
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">
         <span class="rlabel">Who Qualifies as a Likely 2026 Voter</span>
-        <span class="rlabel" style="color:var(--fg-dim);">every member matches a rule · ${fmt(likely)} total</span>
+        <span class="rlabel" style="color:var(--fg-dim);">enters if any hold · ${fmt(likely)} total</span>
       </div>
       <div class="wpanel" style="grid-template-columns:1fr 1fr;gap:0 28px;">
-        <div>${critRow("Voted 4 of 4 last general elections", F.g4)}${critRow("Voted 3 of 4 last general elections", F.g3)}</div>
-        <div>${critRow("Voted 2 of last generals · 2 of 2 or 2 of 3", F.g2)}${critRow("New mover / recent registrant — voted at least once", F.g1)}</div>
+        <div>${crit("var(--teal-lt)", ["Voted 4 of 4 or 3 of 4 last general elections", "Voted the last 2 of 2 general elections"])}</div>
+        <div>${crit("var(--teal-lt)", ["Voted 2 of 3 last general elections", "New mover (past 3 years) who has voted at least once"])}</div>
       </div>
+      <div style="font-family:var(--ff-body);font-size:11px;color:var(--fg-dim);margin-top:12px;line-height:1.5;">Verified against vote history: all ${fmt(likely)} voted 2–4 of the last four generals (${fmt(F.g4 + F.g3)} voted 3 of 4 or 4 of 4), or are recent registrants who have already voted. No non-voters are included.</div>
     </div>
 
     <div class="vcard" style="padding:0;overflow:hidden;margin-top:16px;border-color:rgba(207,65,51,.35);">
