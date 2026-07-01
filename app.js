@@ -1065,8 +1065,8 @@ ROUTES.targets = function (view) {
         <span class="rlabel" style="color:var(--fg-dim);">enters if any hold</span>
       </div>
       <div class="wpanel" style="grid-template-columns:1fr 1fr;gap:0 28px;">
-        <div>${crit("var(--teal-lt)", ["Voted in 2022 <b>and</b> at least one other recent election", "Voted in the last two general elections"])}</div>
-        <div>${crit("var(--teal-lt)", ["Voted in 3 of 4 or 4 of 4 recent generals", "New mover or new registrant who has already voted"])}</div>
+        <div>${crit("var(--teal-lt)", ["Voted in 4 of 4 or 3 of 4 last general elections", "Voted in the last 2 of 2 general elections"])}</div>
+        <div>${crit("var(--teal-lt)", ["Voted in 2 of 3 last general elections", "New mover (past 3 years) who has voted at least once"])}</div>
       </div>
     </div>
 
