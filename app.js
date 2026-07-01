@@ -384,54 +384,56 @@ ROUTES.results = function (view) {
   const race = RES.races[resRace];
   const municipal = !!race.municipal;
   const splitTowns = race.splitTowns || [];
+  const nTowns = RES.towns.length;
 
-  // grouped race selector (President / Governor / State House / First Selectman)
-  const raceSel = RES.groups.map(gp => `<div style="display:flex;flex-direction:column;gap:6px;">
-    <span class="rlabel" style="font-size:8px;color:var(--fg-dim);">${gp.office}</span>
-    <div class="seg">${gp.keys.map(k => `<button class="seg-btn ${k === resRace ? "on" : ""}" data-k="${k}">${RES.races[k].year}</button>`).join("")}</div>
-  </div>`).join("");
+  // two-level selector: office group + cycle year
+  const curGroup = RES.groups.find(gp => gp.keys.indexOf(resRace) >= 0) || RES.groups[0];
+  const officePills = RES.groups.map(gp => {
+    const on = gp === curGroup, latest = gp.keys[gp.keys.length - 1];
+    return `<button class="rs-office ${on ? "on" : ""}" data-office="${latest}">${gp.office}</button>`;
+  }).join("");
+  const cyclePills = curGroup.keys.map(k => `<button class="rs-cyc ${k === resRace ? "on" : ""}" data-k="${k}">${RES.races[k].year}</button>`).join("");
 
-  // turnout history (shared)
+  // turnout by cycle (flat tiles)
   const g = C.gen_years || {}; const years = [2018, 2020, 2022, 2024];
   const maxTurnout = Math.max(...years.map(y => g[y] || 0)) || 1;
-  const turnoutCards = years.map(y => {
-    const v = g[y] || 0, mid = y % 4 !== 0;
-    const c = mid ? "var(--gold-lt)" : "var(--teal-lt)", bar = mid ? "var(--gold)" : "var(--teal)";
-    return `<div style="background:var(--navy-card);padding:16px 18px;"><div class="rlabel">${y} ${mid ? "Midterm" : "Presidential"}</div><div class="r-num" style="font-size:28px;margin:8px 0 12px;color:${c};">${fmt(v)}</div><div style="height:6px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden;"><div style="height:100%;width:${Math.round(100 * v / maxTurnout)}%;background:${bar};border-radius:3px;"></div></div></div>`;
+  const turnoutTiles = years.map(y => { const v = g[y] || 0, mid = y % 4 !== 0;
+    return `<div style="background:var(--navy-card);padding:18px 20px 20px;"><div class="rlabel" style="font-size:10px;margin-bottom:10px;">${y} <span style="color:var(--fg-dim);">· ${mid ? "Midterm" : "Presidential"}</span></div><div class="r-num" style="font-size:34px;line-height:1;">${fmt(v)}</div><div style="height:3px;background:rgba(255,255,255,.06);margin-top:14px;border-radius:2px;"><div style="width:${Math.round(100 * v / maxTurnout)}%;height:3px;background:var(--teal);border-radius:2px;"></div></div></div>`;
   }).join("");
 
-  let summary, townRows;
+  // headline + town rows
+  let headline, townRows;
   if (!municipal) {
-    // ── partisan: two-party summary + swing ──
     const tot = resTotals(race);
     const prev = RES.compare[resRace] ? RES.races[RES.compare[resRace]] : null;
     const prevTot = prev ? resTotals(prev) : null;
     const win = tot.r >= tot.d ? "r" : "d";
-    const winName = win === "r" ? race.rep.name : race.dem.name;
     const winColor = win === "r" ? "var(--rep-lt)" : "var(--dem-lt)";
-    const winBg = win === "r" ? "rgba(220,38,38,.12)" : "rgba(37,99,235,.14)";
-    const winBorder = win === "r" ? "rgba(220,38,38,.4)" : "rgba(37,99,235,.4)";
-    const swingTxt = prevTot ? (() => { const dm = tot.margin - prevTot.margin; return `swing ${dm >= 0 ? "D" : "R"}+${Math.abs(dm).toFixed(1)} vs ${prev.year}`; })() : "first comparable cycle";
-    summary = `<div class="rsum-grid" style="display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr;gap:24px;align-items:center;">
-      <div><div class="rlabel" style="margin-bottom:12px;">${race.office}</div><div style="display:inline-flex;align-items:center;gap:8px;background:${winBg};border:1px solid ${winBorder};border-radius:4px;padding:9px 14px;"><span class="r-num" style="font-size:15px;letter-spacing:1px;text-transform:uppercase;color:${winColor};">${winName}</span><span style="color:${winColor};">✓</span></div><div style="font-family:var(--ff-body);font-size:12px;color:var(--fg-muted);margin-top:10px;">${race.scope}</div></div>
-      <div><div class="rlabel" style="color:var(--rep-lt);">${race.rep.name} (R)</div><div class="r-num" style="font-size:34px;line-height:1;color:var(--rep-lt);margin-top:6px;">${fmt(tot.r)}</div><div style="font-family:var(--ff-body);font-size:12px;color:var(--fg-muted);margin-top:6px;">${pc1(tot.rPct)}</div></div>
-      <div><div class="rlabel" style="color:var(--dem-lt);">${race.dem.name} (D)</div><div class="r-num" style="font-size:34px;line-height:1;color:var(--dem-lt);margin-top:6px;">${fmt(tot.d)}</div><div style="font-family:var(--ff-body);font-size:12px;color:var(--fg-muted);margin-top:6px;">${pc1(tot.dPct)}</div></div>
-      <div><div class="rlabel">Margin</div><div class="r-num" style="font-size:34px;line-height:1;color:${winColor};margin-top:6px;">${marginLabel(tot.margin)}</div><div style="font-family:var(--ff-body);font-size:12px;color:var(--fg-muted);margin-top:6px;">${swingTxt}</div></div>
+    let swingTxt = "first comparable cycle", swingColor = "var(--fg-muted)";
+    if (prevTot) { const dm = tot.margin - prevTot.margin; swingTxt = `swing ${dm >= 0 ? "D" : "R"}+${Math.abs(dm).toFixed(1)} vs ${prev.year}`; swingColor = dm >= 0 ? "var(--dem-lt)" : "var(--rep-lt)"; }
+    headline = `<div style="border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:30px 0 32px;margin-top:4px;">
+      <div class="rlabel" style="margin-bottom:22px;">${race.office} · ${race.year} · ${race.scope}</div>
+      <div class="rhead-grid" style="display:grid;grid-template-columns:1fr auto 1fr;gap:30px;align-items:end;margin-bottom:18px;">
+        <div><div class="rlabel" style="color:var(--dem-lt);margin-bottom:8px;">${race.dem.name} <span style="color:var(--fg-muted);">(D)</span>${win === "d" ? ' <span style="color:var(--gold-lt);">✓</span>' : ""}</div><div class="r-num" style="font-size:52px;line-height:.9;">${fmt(tot.d)}</div><div class="r-num" style="font-size:13px;color:var(--fg-muted);margin-top:6px;">${pc1(tot.dPct)}</div></div>
+        <div style="text-align:center;padding-bottom:6px;"><div class="rlabel" style="font-size:10px;margin-bottom:6px;">Margin</div><div class="r-num" style="font-size:30px;line-height:1;color:${winColor};">${marginLabel(tot.margin)}</div><div class="r-num" style="font-size:11px;margin-top:8px;color:${swingColor};">${swingTxt}</div></div>
+        <div style="text-align:right;"><div class="rlabel" style="color:var(--rep-lt);margin-bottom:8px;">${race.rep.name} <span style="color:var(--fg-muted);">(R)</span>${win === "r" ? ' <span style="color:var(--gold-lt);">✓</span>' : ""}</div><div class="r-num" style="font-size:52px;line-height:.9;">${fmt(tot.r)}</div><div class="r-num" style="font-size:13px;color:var(--fg-muted);margin-top:6px;">${pc1(tot.rPct)}</div></div>
+      </div>
+      <div style="display:flex;height:8px;border-radius:2px;overflow:hidden;"><div style="width:${tot.dPct}%;background:var(--dem);"></div><div style="width:${tot.rPct}%;background:var(--rep);"></div></div>
     </div>`;
-    townRows = RES.towns.map(tn => {
-      const t = race.towns[tn]; if (!t) return "";
+    townRows = RES.towns.map((tn, i) => {
+      const t = race.towns[tn]; const bb = i < nTowns - 1 ? "border-bottom:1px solid var(--border);" : "";
+      if (!t) return `<div class="trow" style="padding:15px 18px;${bb}"><div style="display:flex;justify-content:space-between;align-items:baseline;"><span class="r-num" style="font-size:15px;color:var(--fg);">${tn}</span><span class="rlabel" style="color:var(--fg-dim);">no data</span></div></div>`;
       const two = t.d + t.r; const mm = 100 * (t.d - t.r) / two; const mc = mm >= 0 ? "var(--dem-lt)" : "var(--rep-lt)";
       const isSplit = splitTowns.indexOf(tn) >= 0;
       let sw = "";
       if (prev && prev.towns[tn]) { const p = prev.towns[tn]; const pm = 100 * (p.d - p.r) / (p.d + p.r); const dm = mm - pm;
-        sw = `<span class="r-num" style="font-size:12px;color:${dm >= 0 ? "var(--dem-lt)" : "var(--rep-lt)"};">${dm >= 0 ? "▲ D" : "▼ R"}+${Math.abs(dm).toFixed(1)}</span>`; }
-      return `<div style="border:1px solid var(--border);background:rgba(15,26,44,.4);border-radius:8px;padding:13px 14px;margin-bottom:10px;">
-        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:9px;"><span class="r-num" style="font-size:16px;color:var(--fg);">${tn}${isSplit ? ` <span class="rlabel" style="font-size:8px;color:var(--gold-lt);">· HD-48 split</span>` : ""}</span><span style="display:flex;align-items:baseline;gap:10px;"><span class="r-num" style="font-size:14px;color:${mc};">${marginLabel(mm)}</span>${sw}</span></div>
-        <div style="display:flex;height:26px;border-radius:4px;overflow:hidden;"><div style="width:${100 * t.d / two}%;background:var(--bar-d);display:flex;align-items:center;padding-left:10px;min-width:0;"><span class="r-num" style="font-size:12px;color:#fff;">${fmt(t.d)}</span></div><div style="width:${100 * t.r / two}%;background:var(--bar-r);display:flex;align-items:center;justify-content:flex-end;padding-right:10px;min-width:0;"><span class="r-num" style="font-size:12px;color:#fff;">${fmt(t.r)}</span></div></div>
+        sw = ` <span class="r-num" style="font-size:12px;margin-left:8px;color:${dm >= 0 ? "var(--dem-lt)" : "var(--rep-lt)"};">${dm >= 0 ? "▲ D" : "▼ R"}+${Math.abs(dm).toFixed(1)}</span>`; }
+      return `<div class="trow" style="padding:15px 18px;${bb}">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;"><span class="r-num" style="font-size:15px;color:var(--fg);">${tn}${isSplit ? ` <span class="rlabel" style="font-size:8px;color:var(--gold-lt);">· HD-48</span>` : ""}</span><span class="r-num" style="font-size:13px;letter-spacing:.5px;"><span style="color:${mc};">${marginLabel(mm)}</span>${sw}</span></div>
+        <div style="display:flex;height:22px;border-radius:2px;overflow:hidden;"><div class="r-num" style="width:${100 * t.d / two}%;background:var(--dem);display:flex;align-items:center;padding-left:8px;font-size:11px;color:#fff;min-width:0;">${fmt(t.d)}</div><div class="r-num" style="width:${100 * t.r / two}%;background:var(--rep);display:flex;align-items:center;justify-content:flex-end;padding-right:8px;font-size:11px;color:#fff;min-width:0;">${fmt(t.r)}</div></div>
       </div>`;
     }).join("");
   } else {
-    // ── municipal: each town runs its own First Selectman race ──
     const holds = {};
     RES.towns.forEach(tn => { const t = race.towns[tn]; if (t) holds[t.a.p] = (holds[t.a.p] || 0) + 1; });
     const holdTxt = Object.entries(holds).map(([p, n]) => `${n} ${p}`).join(" · ");
@@ -439,39 +441,54 @@ ROUTES.results = function (view) {
       if (!t) return `<div style="display:flex;align-items:center;gap:8px;"><span style="width:9px;height:9px;border-radius:2px;background:var(--fg-dim);flex-shrink:0;"></span><span class="r-num" style="font-size:13px;color:var(--fg-muted);">${tn}: no race</span></div>`;
       return `<div style="display:flex;align-items:center;gap:8px;"><span style="width:9px;height:9px;border-radius:2px;background:${pbar(t.a.p)};flex-shrink:0;"></span><span class="r-num" style="font-size:13px;color:var(--fg);">${tn}: ${t.a.n}</span><span class="rlabel" style="font-size:8px;color:${pcol(t.a.p)};">${t.a.p}</span></div>`;
     }).join("");
-    summary = `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:24px;flex-wrap:wrap;">
-      <div><div class="rlabel" style="margin-bottom:10px;">First Selectman · ${race.year}</div><div style="font-family:var(--ff-body);font-size:12px;color:var(--fg-muted);max-width:46ch;line-height:1.55;">Municipal offices — each town elects its own First Selectman.${holdTxt ? " Winners: " + holdTxt + "." : ""}</div></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 22px;">${chips}</div>
+    headline = `<div style="border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:26px 0 28px;margin-top:4px;">
+      <div class="rlabel" style="margin-bottom:16px;">First Selectman · ${race.year} · Municipal — by town</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;">
+        <div style="font-family:var(--ff-body);font-size:13px;color:var(--fg-muted);max-width:44ch;line-height:1.55;">Each town elects its own First Selectman.${holdTxt ? " Winners this cycle: " + holdTxt + "." : ""}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px 26px;">${chips}</div>
+      </div>
     </div>`;
-    townRows = RES.towns.map(tn => { const t = race.towns[tn];
-      if (!t) return `<div style="border:1px solid var(--border);background:rgba(15,26,44,.4);border-radius:8px;padding:13px 14px;margin-bottom:10px;"><div style="display:flex;align-items:baseline;justify-content:space-between;"><span class="r-num" style="font-size:16px;color:var(--fg);">${tn}</span><span class="rlabel" style="color:var(--fg-dim);">no race this cycle</span></div></div>`;
+    townRows = RES.towns.map((tn, i) => { const t = race.towns[tn]; const bb = i < nTowns - 1 ? "border-bottom:1px solid var(--border);" : "";
+      if (!t) return `<div class="trow" style="padding:15px 18px;${bb}"><div style="display:flex;justify-content:space-between;align-items:baseline;"><span class="r-num" style="font-size:15px;color:var(--fg);">${tn}</span><span class="rlabel" style="color:var(--fg-dim);">no race this cycle</span></div></div>`;
       const a = t.a, b = t.b; const two = (a.v + b.v) || 1; const mar = 100 * (a.v - b.v) / two; const uno = b.v === 0;
-      return `<div style="border:1px solid var(--border);background:rgba(15,26,44,.4);border-radius:8px;padding:13px 14px;margin-bottom:10px;">
-        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:9px;"><span class="r-num" style="font-size:16px;color:var(--fg);">${tn}</span><span class="r-num" style="font-size:13px;color:${pcol(a.p)};">${a.n} (${a.p}) ${uno ? "unopp." : "+" + Math.abs(mar).toFixed(1)}</span></div>
-        <div style="display:flex;height:26px;border-radius:4px;overflow:hidden;background:#0F1A2C;"><div style="width:${100 * a.v / two}%;background:${pbar(a.p)};display:flex;align-items:center;padding-left:10px;min-width:0;"><span class="r-num" style="font-size:12px;color:#fff;">${a.n} ${fmt(a.v)}</span></div>${uno ? "" : `<div style="width:${100 * b.v / two}%;background:${pbar(b.p)};display:flex;align-items:center;justify-content:flex-end;padding-right:10px;min-width:0;"><span class="r-num" style="font-size:12px;color:#fff;">${fmt(b.v)} ${b.n}</span></div>`}</div>
+      return `<div class="trow" style="padding:15px 18px;${bb}">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;"><span class="r-num" style="font-size:15px;color:var(--fg);">${tn}</span><span class="r-num" style="font-size:13px;color:${pcol(a.p)};">${a.n} (${a.p}) ${uno ? "unopp." : "+" + Math.abs(mar).toFixed(1)}</span></div>
+        <div style="display:flex;height:22px;border-radius:2px;overflow:hidden;background:#0F1A2C;"><div class="r-num" style="width:${100 * a.v / two}%;background:${pbar(a.p)};display:flex;align-items:center;padding-left:8px;font-size:11px;color:#fff;min-width:0;">${a.n} ${fmt(a.v)}</div>${uno ? "" : `<div class="r-num" style="width:${100 * b.v / two}%;background:${pbar(b.p)};display:flex;align-items:center;justify-content:flex-end;padding-right:8px;font-size:11px;color:#fff;min-width:0;">${fmt(b.v)} ${b.n}</div>`}</div>
       </div>`;
     }).join("");
   }
 
   view.innerHTML =
-    vhead("Certified Returns", "var(--teal-lt)", "Results", RES.note || "CT SOTS") +
-    `<div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:16px;align-items:flex-end;">${raceSel}</div>
-    <div class="vcard" style="padding:22px 26px;margin-bottom:16px;">${summary}</div>
-    <div class="wpanel cols-4" style="grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px;">${turnoutCards}</div>
-    <div class="wpanel" style="grid-template-columns:1.55fr 1fr;gap:16px;align-items:start;">
-      <div class="console-card">
-        <div style="padding:14px 18px 12px;"><span class="rlabel">${municipal ? "Winner by Town" : "Margin by Town"}</span></div>
-        <div id="rmap" style="height:500px;border:0;border-radius:0;"></div>
-        <div class="legend" id="rmap-legend" style="padding:14px 18px;border-top:1px solid var(--border);"></div>
+    vhead("Certified Returns", "var(--teal-lt)", "Results", "CT SOTS · ctemspublic") +
+    `<div style="display:flex;align-items:center;justify-content:space-between;gap:28px;flex-wrap:wrap;margin-bottom:4px;">
+      <div style="display:inline-flex;border:1px solid var(--border);border-radius:4px;overflow:hidden;flex-wrap:wrap;">${officePills}</div>
+      <div style="display:inline-flex;align-items:center;gap:8px;"><span class="rlabel" style="font-size:10px;margin-right:4px;">Cycle</span>${cyclePills}</div>
+    </div>
+
+    ${headline}
+
+    <div style="padding:34px 0 8px;">
+      <div class="rlabel" style="margin-bottom:16px;">Turnout by cycle · ballots cast</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);">${turnoutTiles}</div>
+    </div>
+
+    <div class="rmap-grid" style="display:grid;grid-template-columns:1.35fr 1fr;gap:24px;margin-top:34px;align-items:start;">
+      <div>
+        <div class="rlabel" style="margin-bottom:14px;">${municipal ? "Winner by town" : "Margin by town"}</div>
+        <div style="position:relative;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+          <div id="rmap" style="height:440px;border:0;border-radius:0;"></div>
+          <div class="legend" id="rmap-legend" style="position:absolute;left:14px;bottom:14px;z-index:600;background:rgba(6,17,31,.82);border:1px solid var(--border);border-radius:4px;padding:8px 12px;backdrop-filter:blur(8px);gap:12px;"></div>
+        </div>
       </div>
-      <div class="vcard" style="padding:18px;">
-        <div class="rlabel" style="margin-bottom:14px;">${municipal ? "Town Result" : "Town Result & Swing"}</div>
-        ${townRows}
+      <div>
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px;"><span class="rlabel">${municipal ? "Town result" : "Town result & swing"}</span><span class="rlabel" style="font-size:9px;color:var(--fg-dim);">${municipal ? "winner / runner-up" : "D votes / R votes"}</span></div>
+        <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">${townRows}</div>
       </div>
     </div>`;
 
+  view.querySelectorAll("[data-office]").forEach(b => b.onclick = () => { resRace = b.dataset.office; route(); });
   view.querySelectorAll("[data-k]").forEach(b => b.onclick = () => { resRace = b.dataset.k; route(); });
-  setTimeout(() => resultsMap("rmap", race, "rmap-legend"), 30);
+  setTimeout(() => resultsMap("rmap", race), 30);
 };
 function resultsMap(id, race) {
   const municipal = !!race.municipal;
