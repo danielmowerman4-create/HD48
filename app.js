@@ -1025,6 +1025,11 @@ ROUTES.targets = function (view) {
   const crit = (col, items) => items.map(c => `<div style="display:flex;align-items:flex-start;gap:11px;padding:11px 0;border-bottom:1px solid var(--hairline);">
       <span style="color:${col};font-size:14px;flex-shrink:0;line-height:1.3;">✓</span>
       <span style="font-family:var(--ff-body);font-size:13.5px;color:var(--fg);line-height:1.45;">${c}</span></div>`).join("");
+  const F = s.likely_freq || { g4: 0, g3: 0, g2: 0, g1: 0 };
+  const critRow = (label, n) => `<div style="display:flex;align-items:center;gap:11px;padding:11px 0;border-bottom:1px solid var(--hairline);">
+      <span style="color:var(--teal-lt);font-size:14px;flex-shrink:0;">✓</span>
+      <span style="flex:1;font-family:var(--ff-body);font-size:13.5px;color:var(--fg);line-height:1.4;">${label}</span>
+      <span class="r-num" style="font-size:15px;color:var(--teal-lt);">${fmt(n)}</span></div>`;
   const metricBtns = TGT_METRICS.map(m => `<button class="seg-btn ${m.key === targetMetric ? "on" : ""}" data-tmetric="${m.key}">${m.label}</button>`).join("");
   const rankRows = ranked.map((t, i) => `<div class="prow" data-ttown="${t.name}" role="button" tabindex="0" style="${t.name === targetSel ? "background:rgba(34,170,188,.12);border-color:rgba(34,170,188,.35);" : ""}">
       <span class="r-num" style="font-size:12px;color:var(--fg-muted);width:18px;">${String(i + 1).padStart(2, "0")}</span>
@@ -1062,11 +1067,11 @@ ROUTES.targets = function (view) {
     <div class="vcard" style="padding:20px 22px;margin-bottom:16px;">
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">
         <span class="rlabel">Who Qualifies as a Likely 2026 Voter</span>
-        <span class="rlabel" style="color:var(--fg-dim);">enters if any hold</span>
+        <span class="rlabel" style="color:var(--fg-dim);">every member matches a rule · ${fmt(likely)} total</span>
       </div>
       <div class="wpanel" style="grid-template-columns:1fr 1fr;gap:0 28px;">
-        <div>${crit("var(--teal-lt)", ["Voted in 4 of 4 or 3 of 4 last general elections", "Voted in the last 2 of 2 general elections"])}</div>
-        <div>${crit("var(--teal-lt)", ["Voted in 2 of 3 last general elections", "New mover (past 3 years) who has voted at least once"])}</div>
+        <div>${critRow("Voted 4 of 4 last general elections", F.g4)}${critRow("Voted 3 of 4 last general elections", F.g3)}</div>
+        <div>${critRow("Voted 2 of last generals · 2 of 2 or 2 of 3", F.g2)}${critRow("New mover / recent registrant — voted at least once", F.g1)}</div>
       </div>
     </div>
 
