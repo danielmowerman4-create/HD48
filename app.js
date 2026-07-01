@@ -888,9 +888,6 @@ ROUTES.targets = function (view) {
   const mixBlock = (pairs, lw) => { const max = Math.max(...pairs.map(p => p[1])) || 1; return pairs.map(([l, v], i) => barMix(l, fmt(v), typeColors[i] || "var(--fg-muted)", Math.max(2, 100 * v / max), lw)).join(""); };
   const typeMix = mixBlock(entries(s.target_types), 210);
   const partyMix = mixBlock(entries(s.parties).map(([k, v]) => [partyName(k), v]), 110);
-  const auditMix = mixBlock(entries(s.not_targeted_parties).map(([k, v]) => [partyName(k), v]), 130);
-  const publicExports = (TARGET.exports || []).filter(x => !/\.csv$/i.test(x.href || ""));
-  const exportLinks = publicExports.map(x => `<a class="chip" href="${x.href}" download>${x.label}</a>`).join("");
   const targetMetrics = {
     target_rate:   { label: "Target rate", get: t => t.target_rate, fmt: pc1, color: [34, 170, 188],  hex: "#22AABC", legend: "Targets ÷ likely voters" },
     targets:       { label: "Targets", get: t => t.targets, fmt: fmt, color: [212, 160, 23],  hex: "#F0B82A", legend: "Total targets" },
@@ -974,26 +971,7 @@ ROUTES.targets = function (view) {
       </div>
     </div>
 
-    <div class="vcard" style="padding:20px 22px;margin-bottom:16px;">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:16px;"><span class="rlabel">Not Targeted · Party Audit</span><span class="rlabel" style="color:var(--fg-dim);">who we are leaving out, and why</span></div>
-      <div class="wpanel" style="grid-template-columns:1.5fr 1fr;gap:24px;align-items:start;">
-        <div>${auditMix}</div>
-        <div>
-          <div class="rlabel" style="margin-bottom:10px;">L2 Coverage</div>
-          <div class="dl">
-            <dt>Likely voters matched</dt><dd>${fmt(s.l2_match.likely)}</dd>
-            <dt>Targets matched</dt><dd>${fmt(s.l2_match.targets)}</dd>
-            <dt>Not targeted overall</dt><dd>${fmt(s.not_targeted)}</dd>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="vcard" style="padding:18px 22px;margin-bottom:16px;">
-      <div class="rlabel" style="margin-bottom:12px;">Public Summaries</div>
-      <div style="display:flex;gap:9px;flex-wrap:wrap;">${exportLinks}</div>
-    </div>
-    <div class="vbanner"><span class="tag" style="font-size:10px;color:var(--gold);">Model</span><span class="kicker" style="text-transform:none;letter-spacing:0;font-family:var(--ff-body);font-size:10.5px;">Fixed universe for campaign planning; see public summaries for detail.</span></div>`;
+    `;
 
   view.querySelectorAll("[data-target-metric]").forEach(btn => btn.onclick = () => { targetMetric = btn.dataset.targetMetric; route(); });
   view.querySelectorAll("[data-ttown]").forEach(eln => {
