@@ -1025,7 +1025,7 @@ ROUTES.targets = function (view) {
   const crit = (col, items) => items.map(c => `<div style="display:flex;align-items:flex-start;gap:11px;padding:11px 0;border-bottom:1px solid var(--hairline);">
       <span style="color:${col};font-size:14px;flex-shrink:0;line-height:1.3;">✓</span>
       <span style="font-family:var(--ff-body);font-size:13.5px;color:var(--fg);line-height:1.45;">${c}</span></div>`).join("");
-  const F = s.likely_freq || { g4: 0, g3: 0, g2: 0, g1: 0 };
+  const F = s.likely_freq || { g43: 0, last22: 0, of23: 0, newmover: 0 };
   const critRow = (label, n) => `<div style="display:flex;align-items:center;gap:11px;padding:11px 0;border-bottom:1px solid var(--hairline);">
       <span style="color:var(--teal-lt);font-size:14px;flex-shrink:0;">✓</span>
       <span style="flex:1;font-family:var(--ff-body);font-size:13.5px;color:var(--fg);line-height:1.4;">${label}</span>
@@ -1070,10 +1070,10 @@ ROUTES.targets = function (view) {
         <span class="rlabel" style="color:var(--fg-dim);">enters if any hold · ${fmt(likely)} total</span>
       </div>
       <div class="wpanel" style="grid-template-columns:1fr 1fr;gap:0 28px;">
-        <div>${crit("var(--teal-lt)", ["Voted 4 of 4 or 3 of 4 last general elections", "Voted the last 2 of 2 general elections"])}</div>
-        <div>${crit("var(--teal-lt)", ["Voted 2 of 3 last general elections", "New mover (past 3 years) who has voted at least once"])}</div>
+        <div>${critRow("Voted 4 of 4 or 3 of 4 last general elections", F.g43)}${critRow("Voted the last 2 of 2 general elections", F.last22)}</div>
+        <div>${critRow("Voted 2 of 3 last general elections", F.of23)}${critRow("New mover (past 3 years) — voted at least once", F.newmover)}</div>
       </div>
-      <div style="font-family:var(--ff-body);font-size:11px;color:var(--fg-dim);margin-top:12px;line-height:1.5;">Verified against vote history: all ${fmt(likely)} voted 2–4 of the last four generals (${fmt(F.g4 + F.g3)} voted 3 of 4 or 4 of 4), or are recent registrants who have already voted. No non-voters are included.</div>
+      <div style="font-family:var(--ff-body);font-size:11px;color:var(--fg-dim);margin-top:12px;line-height:1.5;">Counts computed per voter from vote history in the SOTS/L2 file; ${fmt(F.g43 + F.last22 + F.of23 + F.newmover)} total, every member accounted for.</div>
     </div>
 
     <div class="vcard" style="padding:0;overflow:hidden;margin-top:16px;border-color:rgba(207,65,51,.35);">
