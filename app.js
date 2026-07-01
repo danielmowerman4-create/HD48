@@ -735,12 +735,14 @@ function verdictMap(recs, byName, onPick) {
 /* ───────────────── ANALYSIS · DISTRICT PROFILE ───────────────── */
 let analysisMetric = "age_50_plus_rate";
 let analysisTown = null;
-const METRIC_SHORT = { age_50_plus_rate: "Senior 50+", outdoor_l2_rate: "Outdoor · Gun", election_day_rate: "Election Day", early_vote_rate: "Early Vote" };
+const METRIC_SHORT = { age_50_plus_rate: "Senior 50+", outdoor_l2_rate: "Outdoor · Gun", election_day_rate: "Election Day", early_vote_rate: "Early Vote", rep_pct: "Republican %", una_pct: "Unaffiliated %" };
 const METRIC_STYLE = {
   age_50_plus_rate:  { rgb: [34, 170, 188],  hex: "#22AABC", legend: "Age 50+ share" },
   outdoor_l2_rate:   { rgb: [212, 160, 23],  hex: "#F0B82A", legend: "Outdoor / gun L2 cluster" },
   election_day_rate: { rgb: [207, 65, 51],   hex: "#F06A5A", legend: "Election Day share" },
   early_vote_rate:   { rgb: [111, 168, 214], hex: "#6FA8D6", legend: "Early vote share" },
+  rep_pct:           { rgb: [207, 65, 51],   hex: "#F06A5A", legend: "Republican registration share" },
+  una_pct:           { rgb: [138, 160, 188], hex: "#8AA0BC", legend: "Unaffiliated registration share" },
 };
 function selectAnalysisTown(name) { analysisTown = name; route(); }
 ROUTES.analysis = function (view) {
@@ -750,7 +752,10 @@ ROUTES.analysis = function (view) {
     return;
   }
   const A = TARGET.analysis, CON = A.consumer;
-  const rows = (A.map && A.map.towns) || [];
+  const rows = ((A.map && A.map.towns) || []).map(t => {
+    const ts = TOWNS[t.town] || { party_pct: {} };
+    return { ...t, rep_pct: ts.party_pct.Republican || 0, una_pct: ts.party_pct.Unaffiliated || 0, dem_pct: ts.party_pct.Democratic || 0 };
+  });
   const byTown = Object.fromEntries(rows.map(t => [t.town, t]));
   if (!byTown[analysisTown]) analysisTown = rows[0] ? rows[0].town : null;
   const sd = byTown[analysisTown] || {};
@@ -760,20 +765,20 @@ ROUTES.analysis = function (view) {
     { key: "outdoor_l2_rate", label: "Outdoor · Gun" },
     { key: "election_day_rate", label: "Election Day" },
     { key: "early_vote_rate", label: "Early Vote" },
+    { key: "rep_pct", label: "Republican %" },
+    { key: "una_pct", label: "Unaffiliated %" },
   ];
   if (!METRICS.some(m => m.key === analysisMetric)) analysisMetric = "age_50_plus_rate";
   const metric = METRICS.find(m => m.key === analysisMetric);
   const ms = METRIC_STYLE[metric.key];
 
-  // ── district trait figures ──
+  // district summary numbers (headline only — everything else is mapped)
   const ab = CON.age_bands || {};
   const abKnown = Object.entries(ab).reduce((a, [k, v]) => a + (k === "Unknown" ? 0 : v), 0) || 1;
   const senior = (ab["65-79"] || 0) + (ab["80+"] || 0);
   const vm = CON.vote_methods || {}; const vmTot = Object.values(vm).reduce((a, v) => a + v, 0) || 1;
   const eday = vm["Likely Election Day"] || 0, early = vm["Likely Early Vote"] || 0;
-  const ctx = CON.context_signals || {}, exp = CON.expanded_l2_signals || {};
-  const gun = ctx["gun-owner model"] || 0;
-
+  const gun = (CON.context_signals || {})["gun-owner model"] || 0;
   const kpis = [
     ["Senior Share", pc1(100 * senior / abKnown), "var(--teal-lt)", "age 65+ of universe"],
     ["Election Day", pc1(100 * eday / vmTot), "var(--camp-lt)", "vote-method tendency"],
@@ -788,6 +793,8 @@ ROUTES.analysis = function (view) {
     ["Outdoor / gun", pc1(sd.outdoor_l2_rate), "var(--gold-lt)"],
     ["Election Day", pc1(sd.election_day_rate), "var(--camp-lt)"],
     ["Early Vote", pc1(sd.early_vote_rate), "#6FA8D6"],
+    ["Republican %", pc1(sd.rep_pct), "var(--base-lt)"],
+    ["Unaffiliated %", pc1(sd.una_pct), "#8AA0BC"],
     ["Veteran L2", fmt(sd.veteran_l2), "var(--fg)"],
     ["Business L2", fmt(sd.business_l2), "var(--fg)"],
   ].map(([k, v, c]) => `<div class="dpanel-row"><span class="k">${k}</span><span class="r-num" style="font-size:15px;color:${c};">${v}</span></div>`).join("");
@@ -804,35 +811,23 @@ ROUTES.analysis = function (view) {
       </div></div>`;
   }).join("");
 
-  const barList = (pairs, total, color) => pairs.map(([k, v]) => {
-    const w = total ? Math.max(2, 100 * v / total) : 0;
-    return `<div style="display:grid;grid-template-columns:minmax(140px,1fr) 56px 1.1fr;gap:12px;align-items:center;">
-      <span class="tag" style="color:var(--fg);">${k}</span><span class="r-num" style="text-align:right;font-size:14px;color:${color};">${fmt(v)}</span>
-      <span class="scorebar" style="margin:0;"><i style="width:${w}%;background:${color};"></i></span></div>`;
-  }).join("");
-  const agePairs = ["18-34", "35-49", "50-64", "65-79", "80+"].filter(k => ab[k]).map(k => [k, ab[k]]);
-  const gunLabels = { "gun-owner model": "Gun-owner model", "shooting interest": "Shooting interest", "concealed-permit model": "Concealed-permit", "fishing interest": "Fishing interest", "hunting interest": "Hunting interest", "veteran flag": "Veteran", "military status": "Military", "business-owner flag": "Business owner" };
-  const gunPairs = Object.entries({ ...ctx, ...exp }).filter(([k]) => gunLabels[k]).map(([k, v]) => [gunLabels[k], v]).sort((a, b) => b[1] - a[1]).slice(0, 7);
-  const gunMax = Math.max(...gunPairs.map(p => p[1]), 1);
-  const vmPairs = [["Likely Election Day", "Election Day"], ["Likely Early Vote", "Early Vote"], ["Likely Absentee", "Absentee"], ["Mixed Method", "Mixed"]].filter(([k]) => vm[k]).map(([k, l]) => [l, vm[k]]);
-
   view.innerHTML =
-    vhead("District Profile", "var(--teal-lt)", "Analysis", "Aggregate SOTS + L2") +
+    vhead("District Profile · Mapped", "var(--teal-lt)", "Analysis", "Aggregate SOTS + L2") +
     `<div class="wpanel cols-4" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px;">${kpis}</div>
 
-    <div class="console-card" style="margin-bottom:16px;">
+    <div class="console-card">
       <div class="console-head">
-        <span class="rlabel">District Map · Voter Texture</span>
+        <span class="rlabel">District Map · Voter Texture<span class="rlabel" style="color:var(--fg-dim);margin-left:8px;">recolor by trait · click a town</span></span>
         <div class="seg">${metricBtns}</div>
       </div>
-      <div class="console-body" style="display:grid;grid-template-columns:1.6fr 1fr;">
+      <div class="console-body" style="display:grid;grid-template-columns:1.7fr 1fr;">
         <div class="amap-wrap" style="position:relative;border-right:1px solid var(--border);">
-          <div id="amap" style="height:520px;border:0;border-radius:0;"></div>
+          <div id="amap" style="height:600px;border:0;border-radius:0;"></div>
           <div id="amap-legend" class="amap-legend"></div>
         </div>
         <div style="padding:18px;">
           <div style="background:rgba(15,33,64,.6);border:1px solid var(--border-strong);border-radius:8px;padding:16px 18px;margin-bottom:16px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
               <span class="r-num" style="font-size:22px;color:var(--fg);">${analysisTown || "—"}</span>
               <span class="rlabel" style="color:${ms.hex};">${METRIC_SHORT[metric.key]}</span>
             </div>
@@ -846,46 +841,7 @@ ROUTES.analysis = function (view) {
       </div>
     </div>
 
-    <div class="wpanel" style="grid-template-columns:1fr 1fr;gap:16px;">
-      <div class="vcard" style="padding:20px 22px;">
-        <div class="rlabel" style="margin-bottom:14px;">Age<span class="rlabel" style="color:var(--fg-dim);margin-left:8px;">${pc1(100 * senior / abKnown)} are 65+</span></div>
-        <div style="display:flex;flex-direction:column;gap:11px;">${barList(agePairs, abKnown, "var(--teal-lt)")}</div>
-      </div>
-      <div class="vcard" style="padding:20px 22px;">
-        <div class="rlabel" style="margin-bottom:14px;">Vote Method<span class="rlabel" style="color:var(--fg-dim);margin-left:8px;">Election Day vs Early Vote</span></div>
-        <div style="display:flex;flex-direction:column;gap:11px;">${barList(vmPairs, vmTot, "var(--camp-lt)")}</div>
-      </div>
-    </div>
-
-    <div class="vcard" style="padding:20px 22px;margin-top:16px;">
-      <div class="rlabel" style="margin-bottom:16px;">Outdoor / Gun Cluster<span class="rlabel" style="color:var(--fg-dim);margin-left:8px;">L2 lifestyle & context models</span></div>
-      <div style="display:flex;flex-direction:column;gap:11px;">${barList(gunPairs, gunMax, "var(--gold-lt)")}</div>
-    </div>
-
-    <div class="vcard" style="padding:20px 22px;margin-top:16px;">
-      <div class="rlabel" style="margin-bottom:16px;">Party Registration by Town<span class="rlabel" style="color:var(--fg-dim);margin-left:8px;">who is on the rolls</span></div>
-      <div style="display:flex;flex-direction:column;gap:14px;">
-        ${townList().map(t => {
-          const segs = [["Republican", "var(--base-lt)"], ["Unaffiliated", "#8AA0BC"], ["Democratic", "#60A5FA"], ["Minor / Other", "var(--gold-lt)"]];
-          const bar = segs.map(([p, c]) => `<div style="width:${t.party_pct[p]}%;background:${c}"></div>`).join("");
-          return `<div>
-            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
-              <span class="r-num" style="font-size:14px;color:var(--fg);">${t.name}</span>
-              <span class="r-num" style="font-size:12px;color:var(--fg-muted);">${fmt(t.active)} active · <span style="color:var(--base-lt);">${pc1(t.party_pct.Republican)} R</span></span>
-            </div>
-            <div style="display:flex;height:12px;border-radius:3px;overflow:hidden;background:rgba(255,255,255,.05);">${bar}</div>
-          </div>`;
-        }).join("")}
-      </div>
-      <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:16px;font-family:var(--ff-body);font-size:11px;color:var(--fg-dim);">
-        <span style="display:flex;align-items:center;gap:6px;"><i style="width:11px;height:11px;border-radius:2px;background:var(--base-lt);"></i>Republican</span>
-        <span style="display:flex;align-items:center;gap:6px;"><i style="width:11px;height:11px;border-radius:2px;background:#8AA0BC;"></i>Unaffiliated</span>
-        <span style="display:flex;align-items:center;gap:6px;"><i style="width:11px;height:11px;border-radius:2px;background:#60A5FA;"></i>Democratic</span>
-        <span style="display:flex;align-items:center;gap:6px;"><i style="width:11px;height:11px;border-radius:2px;background:var(--gold-lt);"></i>Minor</span>
-      </div>
-    </div>
-
-    <div class="vbanner"><span class="tag" style="font-size:10px;color:var(--gold);">Not in L2 build</span><span class="kicker" style="text-transform:none;letter-spacing:0;font-family:var(--ff-body);font-size:10.5px;">Average income, language, homeowner and family signals are not in the current SOTS/L2 extract — wire them once the vendor file lands. Aggregate signals only; no voter-level records shown.</span></div>`;
+    <div class="vbanner" style="margin-top:16px;"><span class="tag" style="font-size:10px;color:var(--gold);">Not in L2 build</span><span class="kicker" style="text-transform:none;letter-spacing:0;font-family:var(--ff-body);font-size:10.5px;">Average income, language, homeowner and family signals are not in the current SOTS/L2 extract — wire them once the vendor file lands. Aggregate signals only; no voter-level records shown.</span></div>`;
 
   view.querySelectorAll("[data-analysis-metric]").forEach(btn => btn.onclick = () => { analysisMetric = btn.dataset.analysisMetric; route(); });
   view.querySelectorAll("[data-atown]").forEach(eln => {
@@ -893,15 +849,14 @@ ROUTES.analysis = function (view) {
     eln.onclick = go;
     eln.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } };
   });
-  setTimeout(() => analysisMap("amap", metric, analysisTown), 30);
+  setTimeout(() => analysisMap("amap", rows, metric, analysisTown), 30);
 };
 
-function analysisMap(id, metric, selTown) {
+function analysisMap(id, rows, metric, selTown) {
   const host = document.getElementById(id);
-  if (!host || !GEO || !GEO.towns || !TARGET || !TARGET.analysis || !TARGET.analysis.map) return;
-  const rows = TARGET.analysis.map.towns || [];
+  if (!host || !GEO || !GEO.towns || !rows || !rows.length) return;
   const byTown = Object.fromEntries(rows.map(t => [t.town, t]));
-  const ms = METRIC_STYLE[metric.key] || METRIC_STYLE.base_lean_rate;
+  const ms = METRIC_STYLE[metric.key] || METRIC_STYLE.age_50_plus_rate;
   const vals = rows.map(t => t[metric.key] || 0);
   const min = Math.min(...vals), max = Math.max(...vals);
   const color = v => {
