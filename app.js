@@ -88,63 +88,116 @@ function chart(parent, cfg, h) {
 const gridX = { grid: { display: false }, ticks: { autoSkip: false } };
 const gridY = { grid: { color: "rgba(255,255,255,.05)" }, border: { display: false }, ticks: { precision: 0 } };
 
-/* ============================ DATA · EXPORT ============================ */
-let exportView = "town";
-function selectExportView(v) { exportView = v; route(); }
+/* ============================ DATA · CONTACT LIST BUILDER ============================ */
+let voterRows = null, voterErr = null, dataSel = null;
+const PARTY_LABEL = { R: "Republican", D: "Democrat", U: "Unaffiliated", IT: "Independent", L: "Libertarian", G: "Green", Worki: "Working Families" };
+function splitCSVLine(line) {
+  const out = []; let cur = "", q = false;
+  for (let i = 0; i < line.length; i++) { const c = line[i];
+    if (q) { if (c === '"') { if (line[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += c; }
+    else { if (c === ",") { out.push(cur); cur = ""; } else if (c === '"') q = true; else cur += c; } }
+  out.push(cur); return out;
+}
+function parseVoterCSV(text) {
+  const lines = text.split(/\r?\n/); const head = splitCSVLine(lines[0]); const ix = k => head.indexOf(k);
+  const iId = ix("voter_id"), iFn = ix("first_name"), iLn = ix("last_name"), iAd = ix("residential_address"), iPt = ix("party"), iTn = ix("town");
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) { if (!lines[i]) continue; const f = splitCSVLine(lines[i]);
+    rows.push({ id: f[iId], fn: f[iFn], ln: f[iLn], addr: f[iAd], party: f[iPt], town: f[iTn] }); }
+  return rows;
+}
+function addrParts(a) { const street = (a || "").split(",")[0].trim(); const m = street.match(/^(\d+[A-Za-z\-]*)\s+(.*)$/); return m ? [m[1], m[2]] : ["", street]; }
+function csvCell(v) { v = String(v == null ? "" : v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+
 ROUTES.geography = function (view) {
-  const TW = townList();
-  const s = TARGET && TARGET.summary;
-  const tByName = Object.fromEntries((TARGET && TARGET.towns ? TARGET.towns : []).map(t => [t.town, t]));
-  const partyTgt = { "Republican": s ? s.parties.R : null, "Unaffiliated": s ? s.parties.U : null,
-    "Democratic": s ? s.parties.D : null, "Minor / Other": s ? ((s.parties.IT || 0) + (s.parties.L || 0) + (s.parties.G || 0)) : null };
+  const TOWNS_LIST = ["Colchester", "Lebanon", "Bozrah", "Franklin"];
+  const PARTIES = [["R", "Republican"], ["D", "Democrat"], ["U", "Unaffiliated"], ["IT", "Independent"], ["L", "Libertarian"], ["G", "Green"], ["Worki", "Working Families"]];
+  if (voterErr) {
+    view.innerHTML = vhead("Contact List", "var(--teal-lt)", "Data · Build a List", "Voter file not loaded") +
+      `<div class="note info" style="max-width:74ch;"><div><b>The contact-list builder runs where the voter file is present.</b><br><br>To keep individual voter records — names, home addresses, state voter IDs — off the public web, the Likely 2026 Voter file is not bundled in this public build. Open the dashboard locally (or on a private / password-gated host) with <code>exports/hd48_2026_likely_voter_universe.csv</code> in place to search, filter, and export contact lists (First Name · Last Name · State Voter ID · Address No. · Street Name · Party).</div></div>`;
+    return;
+  }
+  if (!voterRows) {
+    view.innerHTML = vhead("Contact List", "var(--teal-lt)", "Data · Build a List", "Loading voter file…") +
+      `<div class="note info"><div>Loading the Likely 2026 Voter file…</div></div>`;
+    fetch("exports/hd48_2026_likely_voter_universe.csv").then(r => { if (!r.ok) throw new Error("absent"); return r.text(); }).then(t => { voterRows = parseVoterCSV(t); route(); }).catch(() => { voterErr = "absent"; route(); });
+    return;
+  }
+  if (!dataSel) dataSel = { towns: new Set(TOWNS_LIST), parties: new Set(PARTIES.map(p => p[0])), search: "" };
 
-  const VIEWS = {
-    town:  { label: "By Town", note: "Active registration by town", accent: "var(--teal-lt)",
-      cols: [{ k: "town", l: "Town" }, { k: "active", l: "Active", n: 1 }, { k: "rep", l: "Republican", n: 1 }, { k: "una", l: "Unaffiliated", n: 1 }, { k: "dem", l: "Democratic", n: 1 }],
-      rows: TW.map(t => ({ town: t.name, active: t.active, rep: t.party.Republican, una: t.party.Unaffiliated, dem: t.party.Democratic })) },
-    party: { label: "By Party", note: "District registration and target universe by party", accent: "var(--gold-lt)",
-      cols: [{ k: "party", l: "Party" }, { k: "reg", l: "Registered", n: 1 }, { k: "pct", l: "% Active" }, { k: "tgt", l: "In Target Universe", n: 1 }],
-      rows: PARTY.map(p => ({ party: p, reg: T.party[p], pct: pc1(T.party_pct[p]), tgt: partyTgt[p] })) },
-    rep:   { label: "Republican Targets", note: "Base GOTV — registered Republicans to turn out", accent: "var(--base-lt)",
-      cols: [{ k: "town", l: "Town" }, { k: "rep", l: "Registered R", n: 1 }, { k: "pct", l: "% of Town" }],
-      rows: TW.map(t => ({ town: t.name, rep: t.party.Republican, pct: pc1(t.party_pct.Republican) })) },
-    unaff: { label: "Unaffiliated Targets", note: "Persuasion universe — unaffiliated-heavy persuadables", accent: "var(--persuasion-lt)",
-      cols: [{ k: "town", l: "Town" }, { k: "pers", l: "Persuasion Targets", n: 1 }, { k: "rate", l: "Target Rate" }],
-      rows: TW.map(t => { const x = tByName[t.name] || {}; return { town: t.name, pers: x.persuasion || 0, rate: pc1(x.target_rate || 0) }; }) },
-    dem:   { label: "Democrat Targets", note: "Democratic crossover targets", accent: "#60A5FA",
-      cols: [{ k: "town", l: "Town" }, { k: "cross", l: "Crossover Targets", n: 1 }],
-      rows: TW.map(t => { const x = tByName[t.name] || {}; return { town: t.name, cross: x.dem_crossover || 0 }; }) },
+  const filtered = () => { const q = dataSel.search.trim().toLowerCase();
+    return voterRows.filter(r => dataSel.towns.has(r.town) && dataSel.parties.has(r.party) &&
+      (!q || (r.fn + " " + r.ln + " " + r.addr + " " + r.id).toLowerCase().includes(q))); };
+
+  const cbTown = TOWNS_LIST.map(t => `<label class="dcheck"><input type="checkbox" data-town="${t}" ${dataSel.towns.has(t) ? "checked" : ""}>${t}</label>`).join("");
+  const cbParty = PARTIES.map(([c, l]) => `<label class="dcheck"><input type="checkbox" data-party="${c}" ${dataSel.parties.has(c) ? "checked" : ""}>${l}</label>`).join("");
+
+  view.innerHTML = vhead("Contact List", "var(--teal-lt)", "Data · Build a List", "Likely 2026 Voter file · " + fmt(voterRows.length)) +
+    `<div class="wpanel" style="grid-template-columns:1fr 322px;gap:16px;align-items:start;">
+      <div style="display:flex;flex-direction:column;gap:16px;">
+        <div class="vcard" style="padding:20px 22px;">
+          <div class="rlabel" style="margin-bottom:10px;">Search</div>
+          <input id="d-search" placeholder="Name, address, or voter ID" value="${dataSel.search.replace(/"/g, "&quot;")}" style="width:100%;box-sizing:border-box;padding:12px 15px;border-radius:8px;border:1px solid var(--border-strong);background:#0B1A2C;color:var(--fg);font-family:var(--ff-body);font-size:14px;outline:none;">
+        </div>
+        <div class="vcard" style="padding:20px 22px;">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;"><span class="rlabel">Towns</span><button class="seg-btn" data-all="towns">All</button><button class="seg-btn" data-none="towns">None</button></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 22px;">${cbTown}</div>
+        </div>
+        <div class="vcard" style="padding:20px 22px;">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;"><span class="rlabel">Party</span><button class="seg-btn" data-all="parties">All</button><button class="seg-btn" data-none="parties">None</button></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 22px;">${cbParty}</div>
+        </div>
+      </div>
+
+      <div class="vcard" style="padding:0;overflow:hidden;position:sticky;top:120px;">
+        <div style="padding:22px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,rgba(34,170,188,.09),transparent);">
+          <div class="rlabel">In Current List</div>
+          <div id="d-count" class="r-num" style="font-size:48px;line-height:.9;color:var(--teal-lt);margin-top:6px;">—</div>
+          <div class="rlabel" style="color:var(--fg-dim);margin-top:4px;">likely voters selected</div>
+        </div>
+        <div style="padding:18px 22px;">
+          <div class="rlabel" style="margin-bottom:10px;">Quick Presets</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px;">
+            <button class="seg-btn" data-preset="all">All</button>
+            <button class="seg-btn" data-preset="R">Republicans</button>
+            <button class="seg-btn" data-preset="RU">R + Unaffiliated</button>
+            <button class="seg-btn" data-preset="U">Unaffiliated</button>
+          </div>
+          <div class="rlabel" style="margin-bottom:10px;">Export</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;">
+            <button class="btn pri" id="d-csv" style="padding:11px 18px;font-size:12px;letter-spacing:1.5px;border-radius:6px;">CSV ↓</button>
+            <button class="seg-btn" id="d-walk">Walk List</button>
+            <button class="seg-btn" id="d-reset">Reset</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="vbanner" style="margin-top:16px;"><span class="tag" style="font-size:10px;color:var(--gold);">Voter file</span><span class="kicker" style="text-transform:none;letter-spacing:0;font-family:var(--ff-body);font-size:10.5px;">CSV columns: First Name · Last Name · State Voter ID · Address No. · Street Name · Party. Contains individual voter records.</span></div>`;
+
+  const refresh = () => { const c = $("#d-count"); if (c) c.textContent = fmt(filtered().length); };
+  refresh();
+
+  const download = (rows, name, walk) => {
+    const recs = rows.map(r => { const p = addrParts(r.addr); return { no: p[0], st: p[1], r }; });
+    if (walk) recs.sort((a, b) => a.st.localeCompare(b.st) || (parseInt(a.no) || 0) - (parseInt(b.no) || 0));
+    const head = ["First Name", "Last Name", "State Voter ID", "Address No.", "Street Name", "Party"];
+    const lines = recs.map(({ no, st, r }) => [r.fn, r.ln, r.id, no, st, PARTY_LABEL[r.party] || r.party].map(csvCell).join(","));
+    const a = el("a"); a.href = URL.createObjectURL(new Blob([[head.join(","), ...lines].join("\n")], { type: "text/csv" }));
+    a.download = name; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
   };
-  if (!VIEWS[exportView]) exportView = "town";
-  const V = VIEWS[exportView];
 
-  const chips = Object.entries(VIEWS).map(([k, v]) => `<button class="seg-btn ${k === exportView ? "on" : ""}" data-xview="${k}">${v.label}</button>`).join("");
-  const totals = {}; V.cols.forEach(c => { if (c.n) totals[c.k] = V.rows.reduce((a, r) => a + (typeof r[c.k] === "number" ? r[c.k] : 0), 0); });
-  const body = V.rows.map(r => `<tr>${V.cols.map(c => `<td class="${c.n ? "num" : "nm"}">${c.n ? fmt(r[c.k]) : (r[c.k] == null ? "—" : r[c.k])}</td>`).join("")}</tr>`).join("");
-  const totalRow = `<tr style="background:rgba(255,255,255,.02)">${V.cols.map((c, i) => `<td class="${c.n ? "num" : ""}" style="font-family:var(--ff-cond);font-weight:700;font-size:13px;color:var(--fg);border-top:2px solid var(--border-strong)">${i === 0 ? "Total" : (c.n ? fmt(totals[c.k]) : "")}</td>`).join("")}</tr>`;
-
-  view.innerHTML = vhead("Field Data", "var(--teal-lt)", "Data · Export", "Aggregate · SOTS + L2") +
-    `<p style="color:var(--fg-muted);font-size:13px;max-width:78ch;margin:-6px 0 16px;line-height:1.55">Filter the district by town, party and target program, then download any view as CSV. Aggregate counts only — no individual voter records.</p>
-     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">${chips}</div>
-     <div class="vcard" style="padding:0;overflow:hidden">
-       <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;padding:16px 20px 14px;flex-wrap:wrap">
-         <div><span class="rlabel" style="color:${V.accent}">${V.label}</span><div style="font-family:var(--ff-body);font-size:11px;color:var(--fg-dim);margin-top:4px">${V.note}</div></div>
-         <button class="btn pri" id="dl-csv" style="padding:9px 16px;font-size:12px;letter-spacing:1.5px;border-radius:5px">Download CSV ↓</button>
-       </div>
-       <div class="tbl-wrap pretty" style="border-radius:0;border-left:0;border-right:0;border-bottom:0"><table class="dtable"><thead><tr>${V.cols.map(c => `<th class="${c.n ? "num" : ""}">${c.l}</th>`).join("")}</tr></thead><tbody>${body}${totalRow}</tbody></table></div>
-     </div>
-     <div class="vbanner" style="margin-top:16px"><span class="tag" style="font-size:10px;color:var(--gold)">Aggregate</span><span class="kicker" style="text-transform:none;letter-spacing:0;font-family:var(--ff-body);font-size:10.5px">Counts only — no individual voter records are exported.</span></div>`;
-
-  view.querySelectorAll("[data-xview]").forEach(b => b.onclick = () => selectExportView(b.dataset.xview));
-  const dl = view.querySelector("#dl-csv");
-  if (dl) dl.onclick = () => {
-    const head = V.cols.map(c => c.l).join(",");
-    const lines = V.rows.map(r => V.cols.map(c => String(r[c.k] == null ? "" : r[c.k])).join(","));
-    const tot = V.cols.map((c, i) => i === 0 ? "Total" : (c.n ? totals[c.k] : "")).join(",");
-    const csv = [head, ...lines, tot].join("\n");
-    const a = el("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-    a.download = `hd48_${exportView}.csv`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
-  };
+  view.querySelectorAll("[data-town]").forEach(cb => cb.onchange = () => { cb.checked ? dataSel.towns.add(cb.dataset.town) : dataSel.towns.delete(cb.dataset.town); refresh(); });
+  view.querySelectorAll("[data-party]").forEach(cb => cb.onchange = () => { cb.checked ? dataSel.parties.add(cb.dataset.party) : dataSel.parties.delete(cb.dataset.party); refresh(); });
+  view.querySelectorAll("[data-all]").forEach(b => b.onclick = () => { if (b.dataset.all === "towns") dataSel.towns = new Set(TOWNS_LIST); else dataSel.parties = new Set(PARTIES.map(p => p[0])); route(); });
+  view.querySelectorAll("[data-none]").forEach(b => b.onclick = () => { if (b.dataset.none === "towns") dataSel.towns = new Set(); else dataSel.parties = new Set(); route(); });
+  view.querySelectorAll("[data-preset]").forEach(b => b.onclick = () => { const p = b.dataset.preset;
+    dataSel.towns = new Set(TOWNS_LIST); dataSel.search = "";
+    dataSel.parties = p === "R" ? new Set(["R"]) : p === "U" ? new Set(["U"]) : p === "RU" ? new Set(["R", "U"]) : new Set(PARTIES.map(x => x[0]));
+    route(); });
+  const se = $("#d-search"); if (se) se.oninput = () => { dataSel.search = se.value; refresh(); };
+  $("#d-csv").onclick = () => download(filtered(), "hd48_contact_list.csv", false);
+  $("#d-walk").onclick = () => download(filtered(), "hd48_walk_list.csv", true);
+  $("#d-reset").onclick = () => { dataSel = null; route(); };
 };
 
 function rankTable(rows, kind) {
@@ -519,7 +572,7 @@ const RAIL_CTX = {
   verdict:   ["Verdict",  "Where the race stands today: the margin to protect, the universe to move, and the votes still in play."],
   analysis:  ["Analysis", "District profile: age, senior share, vote method, and outdoor/gun texture by town."],
   targets:   ["Targets",  "The Likely 2026 Voter universe, plus a separate Republican Turnout Lift pool."],
-  geography: ["Data",     "Export the district by town, party and target program. Aggregate counts, downloadable as CSV."],
+  geography: ["Data",     "Build a contact list: filter by town, party and search, then export names, IDs, addresses as CSV."],
   results:   ["Results",  "Certified returns by office and town, with swing against the prior comparable race."],
 };
 function renderRail(active) {
