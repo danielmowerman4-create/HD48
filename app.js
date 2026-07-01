@@ -12,7 +12,9 @@ const METHODS = ["Likely Early Vote", "Likely Absentee", "Likely Election Day", 
 
 /* ---- apply campaign identity ---- */
 const root = document.documentElement.style;
-root.setProperty("--camp", "#22AABC");  // war-room primary action = teal; red is reserved for rating / opponent
+root.setProperty("--camp", "#CF4133");   // primary campaign identity = Republican red (brand accent)
+root.setProperty("--camp-lt", "#F06A5A"); // lighter campaign red for text / gradients on dark
+root.setProperty("--camp-deep", "#7E2A22");
 document.title = C.headline + " · DM Strategies";
 document.getElementById("h-title").innerHTML = "<b>" + C.headline + "</b>";
 document.getElementById("b-gen").textContent = "Updated " + C.generated_at.replace("T", " · ").slice(0, 21);
@@ -668,7 +670,7 @@ ROUTES.verdict = function (view) {
     </div>
 
     <div class="wpanel cols-3" style="grid-template-columns:repeat(3,1fr);">
-      <div class="stat" style="--accent:var(--gold-lt);"><div class="sl">01 · Margin</div><div class="sv">${fmt(dec)}</div><div class="ss">2024 decisive votes · protect the edge</div></div>
+      <div class="stat" style="--accent:var(--camp-lt);"><div class="sl">01 · Margin</div><div class="sv">${fmt(dec)}</div><div class="ss">2024 decisive votes · protect the edge</div></div>
       <div class="stat" style="--accent:var(--teal-lt);"><div class="sl">02 · Map</div><div class="sv">${concShare}<span style="font-size:24px;color:var(--fg-muted);">%</span></div><div class="ss">voters in ${k} precincts · concentrate turf</div></div>
       <div class="stat" style="--accent:var(--npa-lt);"><div class="sl">03 · Voters</div><div class="sv">${fmt(persu)}</div><div class="ss">${TARGET ? "persuasion targets" : "persuadables"} · win the swing</div></div>
     </div>
@@ -931,7 +933,7 @@ ROUTES.targets = function (view) {
       <div class="stat" style="--accent:var(--teal-lt);"><div class="sl">Likely Pool</div><div class="sv">${fmt(s.likely_voters)}</div><div class="ss">high + medium tiers</div></div>
       <div class="stat" style="--accent:var(--teal-lt);"><div class="sl">Turnout Plan</div><div class="sv">${fmt(TARGET.planning_turnout)}</div><div class="ss">working assumption</div></div>
       <div class="stat" style="--accent:var(--gold-lt);"><div class="sl">Win Number</div><div class="sv">${fmt(TARGET.win_number)}</div><div class="ss">50% + 1</div></div>
-      <div class="stat" style="--accent:var(--npa-lt);"><div class="sl">Targets</div><div class="sv">${fmt(s.targets)}</div><div class="ss">${pc1(s.target_rate)} of likely pool</div></div>
+      <div class="stat" style="--accent:var(--camp-lt);"><div class="sl">Targets</div><div class="sv">${fmt(s.targets)}</div><div class="ss">${pc1(s.target_rate)} of likely pool</div></div>
     </div>
 
     <div class="console-card" style="margin-bottom:16px;">

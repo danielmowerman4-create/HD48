@@ -16,6 +16,7 @@
   --fg:#EEF3FB; --fg-muted:#6E89A6; --fg-dim:#3D5268;
   --teal:#1A8B9A; --teal-lt:#2FB6C8; --gold:#D4A017; --gold-lt:#F0B82A;
   --purple:#5B7593; --purple-lt:#9DB4CC; --coral:#FF6E6E; --coral-deep:#7E2A22;
+  --camp:#CF4133; --camp-lt:#F06A5A;
   --border:rgba(255,255,255,.07); --border-strong:rgba(255,255,255,.13);
   --ff-display:'Tungsten','Barlow Condensed',Arial,sans-serif;
   --ff-body:'Outfit',system-ui,sans-serif;
@@ -46,8 +47,8 @@ body{font-family:var(--ff-body);background:var(--bg);color:var(--fg);
   color:var(--fg-muted);text-decoration:none;padding:13px 12px;border-radius:6px;position:relative;
   transition:color .18s var(--ease),background .18s var(--ease)}
 .nav a:hover{color:var(--fg);background:rgba(255,255,255,.03)}
-.nav a.active{color:var(--teal-lt);background:linear-gradient(90deg,rgba(47,182,200,.10),transparent)}
-.nav a.active::before{content:"";position:absolute;left:0;top:9px;bottom:9px;width:3px;border-radius:2px;background:var(--teal-lt)}
+.nav a.active{color:var(--camp-lt);background:linear-gradient(90deg,rgba(207,65,51,.12),transparent)}
+.nav a.active::before{content:"";position:absolute;left:0;top:9px;bottom:9px;width:3px;border-radius:2px;background:var(--camp-lt)}
 .rail .foot{margin-top:auto}
 .cycle-pill{display:inline-flex;align-items:center;gap:8px;font-family:var(--ff-display);font-weight:600;
   font-size:11px;letter-spacing:2.4px;text-transform:uppercase;color:var(--gold-lt);
@@ -72,7 +73,7 @@ body{font-family:var(--ff-body);background:var(--bg);color:var(--fg);
 .vtw .sub{font-size:15px;color:var(--fg-muted);line-height:1.35;padding-bottom:6px}
 .gauge{height:9px;border-radius:5px;background:rgba(255,255,255,.06);position:relative;overflow:hidden;margin-top:22px}
 .gauge .fill{position:absolute;left:0;top:0;bottom:0;border-radius:5px;
-  background:linear-gradient(90deg,var(--teal),var(--teal-lt));transform-origin:left;transition:transform .8s var(--ease)}
+  background:linear-gradient(90deg,var(--camp),var(--camp-lt));transform-origin:left;transition:transform .8s var(--ease)}
 .gauge .mark{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--gold-lt);opacity:.85}
 .cleared{margin-top:20px;font-size:14px;color:var(--fg-muted);letter-spacing:.4px}
 .cleared b{font-family:var(--ff-display);font-weight:800;font-size:26px;color:var(--teal-lt);letter-spacing:.5px;margin-right:8px;vertical-align:-2px}
@@ -84,7 +85,7 @@ body{font-family:var(--ff-body);background:var(--bg);color:var(--fg);
 .legend .row .lab{color:var(--fg)}
 .legend .row .val{margin-left:auto;color:var(--fg-muted);font-variant-numeric:tabular-nums;letter-spacing:.4px}
 .open-univ{margin-top:auto;padding-top:34px;font-family:var(--ff-display);font-weight:600;font-size:14px;
-  letter-spacing:2.2px;text-transform:uppercase;color:var(--teal-lt);text-decoration:none;
+  letter-spacing:2.2px;text-transform:uppercase;color:var(--camp-lt);text-decoration:none;
   display:inline-flex;align-items:center;gap:10px;transition:gap .2s var(--ease)}
 .open-univ:hover{gap:16px}
 
@@ -186,7 +187,7 @@ body{font-family:var(--ff-body);background:var(--bg);color:var(--fg);
       <div class="h">Turf by assignment</div>
       <div class="row"><span class="sw" style="background:var(--gold-lt)"></span>Turnout · Bozrah</div>
       <div class="row"><span class="sw" style="background:var(--purple)"></span>Persuasion · Colchester</div>
-      <div class="row"><span class="sw" style="background:var(--teal-lt)"></span>Base · Lebanon &amp; Franklin</div>
+      <div class="row"><span class="sw" style="background:var(--camp-lt)"></span>Base · Lebanon &amp; Franklin</div>
     </div>
     <div class="map-stats">
       <div><div class="lab">Active Reg</div><div class="v" id="st-reg">18,820</div></div>
@@ -251,7 +252,7 @@ gf.style.width=fill.toFixed(1)+"%"; gf.style.transform="scaleX(0)";
 requestAnimationFrame(function(){requestAnimationFrame(function(){gf.style.transform="scaleX(1)";});});
 
 /* path-to-victory bar + legend */
-var SEGS=[["Base",base,"var(--teal)","var(--teal-lt)"],
+var SEGS=[["Base",base,"var(--camp)","var(--camp-lt)"],
           ["Persuasion",persu,"var(--gold)","var(--gold-lt)"],
           ["Swing",swing,"var(--purple)","var(--purple-lt)"]];
 var bar=document.getElementById("ptv-bar"), lg=document.getElementById("ptv-legend");
@@ -271,8 +272,8 @@ requestAnimationFrame(function(){requestAnimationFrame(function(){
 /* ── the actual HD-48 map ── */
 var TURF={ // town → [program, fill, stroke]
   "Colchester":["Persuasion","#5B7593","#9DB4CC"],
-  "Lebanon":["Base","#1A8B9A","#2FB6C8"],
-  "Franklin":["Base","#1A8B9A","#2FB6C8"],
+  "Lebanon":["Base","#B23A2E","#F06A5A"],
+  "Franklin":["Base","#B23A2E","#F06A5A"],
   "Bozrah":["Turnout","#C79413","#F0B82A"]
 };
 var map=L.map("map",{scrollWheelZoom:false,zoomControl:false,attributionControl:false,
