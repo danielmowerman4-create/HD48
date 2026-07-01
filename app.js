@@ -934,6 +934,24 @@ function analysisMap(id, metric, selTown) {
 }
 
 /* ───────────────── TARGETS · LIKELY 2026 VOTER ───────────────── */
+let targetSel = null;
+let tuApplyStyles = null;
+function selectTargetTown(name) { targetSel = name; if (tuApplyStyles) tuApplyStyles(); paintTargetSel(); }
+function paintTargetSel() {
+  const host = document.getElementById("tu-sel"); if (!host || !TARGET) return;
+  const t = (TARGET.towns || []).find(x => x.town === targetSel); if (!t) return;
+  const likely = TARGET.summary.likely_voters || 1;
+  const reg = TOWNS[t.town] ? TOWNS[t.town].active : 0;
+  host.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <span class="r-num" style="font-size:24px;color:var(--fg);">${t.town}</span>
+      <span class="rlabel" style="color:var(--teal-lt);">${pc1(100 * t.likely / likely)} of universe</span>
+    </div>
+    <div class="dpanel-row"><span class="k">Likely 2026 Voter</span><span class="r-num" style="font-size:15px;color:var(--teal-lt);">${fmt(t.likely)}</span></div>
+    <div class="dpanel-row"><span class="k">Active registration</span><span class="r-num" style="font-size:15px;color:var(--fg);">${fmt(reg)}</span></div>
+    <div class="dpanel-row"><span class="k">Modeled target rate</span><span class="r-num" style="font-size:15px;color:var(--gold-lt);">${pc1(t.target_rate)}</span></div>
+    <div class="dpanel-row"><span class="k">Likely ÷ active</span><span class="r-num" style="font-size:15px;color:var(--fg);">${pc1(100 * t.likely / (reg || 1))}</span></div>`;
+}
 ROUTES.targets = function (view) {
   if (!TARGET) {
     view.innerHTML = vhead("Turnout Model", "var(--gold-lt)", "Universe Not Loaded", "Run build/import_targets.py") +
@@ -944,8 +962,11 @@ ROUTES.targets = function (view) {
   const likely = s.likely_voters;
   const win = TARGET.win_number, plan = TARGET.planning_turnout;
   const cleared = myVotes - win;
-  const townRows = (TARGET.towns || []).slice().sort((a, b) => b.likely - a.likely);
-  const lmax = Math.max(...townRows.map(t => t.likely), 1);
+  const recs = (TARGET.towns || []).map(t => ({ name: t.town, likely: t.likely, target_rate: t.target_rate, reg: TOWNS[t.town] ? TOWNS[t.town].active : 0 }));
+  const byName = Object.fromEntries(recs.map(r => [r.name, r]));
+  if (!byName[targetSel]) targetSel = recs.slice().sort((a, b) => b.likely - a.likely)[0] ? recs.slice().sort((a, b) => b.likely - a.likely)[0].name : null;
+  const ranked = recs.slice().sort((a, b) => b.likely - a.likely);
+  const lmax = Math.max(...ranked.map(t => t.likely), 1);
   // Turnout Lift: active registered Republicans outside the Likely-Voter universe
   const lift = Math.max(0, (T.party.Republican || 0) - (s.parties.R || 0));
 
@@ -953,6 +974,12 @@ ROUTES.targets = function (view) {
   const crit = (col, items) => items.map(c => `<div style="display:flex;align-items:flex-start;gap:11px;padding:11px 0;border-bottom:1px solid var(--hairline);">
       <span style="color:${col};font-size:14px;flex-shrink:0;line-height:1.3;">✓</span>
       <span style="font-family:var(--ff-body);font-size:13.5px;color:var(--fg);line-height:1.45;">${c}</span></div>`).join("");
+  const rankRows = ranked.map((t, i) => `<div class="prow" data-ttown="${t.name}" role="button" tabindex="0" style="${t.name === targetSel ? "background:rgba(34,170,188,.12);border-color:rgba(34,170,188,.35);" : ""}">
+      <span class="r-num" style="font-size:12px;color:var(--fg-muted);width:18px;">${String(i + 1).padStart(2, "0")}</span>
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;"><span class="r-num" style="font-size:15px;color:var(--fg);">${t.name}</span><span class="r-num" style="font-size:14px;color:var(--teal-lt);">${fmt(t.likely)}</span></div>
+        <div style="height:5px;border-radius:3px;background:rgba(255,255,255,.06);overflow:hidden;"><div style="height:100%;width:${100 * t.likely / lmax}%;background:var(--teal-lt);border-radius:3px;"></div></div>
+      </div></div>`).join("");
 
   view.innerHTML =
     vhead("2026 Turnout Model", "var(--gold-lt)", "Likely 2026 Voter", "Generated " + TARGET.generated_at.slice(0, 10)) +
@@ -963,31 +990,30 @@ ROUTES.targets = function (view) {
       ${kpi("Cleared vs Win", (cleared >= 0 ? "+" : "−") + fmt(Math.abs(cleared)), "likely vs win number", cleared >= 0 ? "var(--teal-lt)" : "var(--camp-lt)", cleared >= 0 ? "var(--teal-lt)" : "var(--camp-lt)")}
     </div>
 
-    <div class="wpanel" style="grid-template-columns:1fr 1.1fr;gap:16px;align-items:start;">
-      <div class="vcard" style="padding:20px 22px;">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">
-          <span class="rlabel">Who Qualifies</span>
-          <span class="r-num" style="font-size:30px;line-height:.9;color:var(--teal-lt);">${fmt(likely)}</span>
+    <div class="console-card" style="margin-bottom:16px;">
+      <div class="console-head"><span class="rlabel">District Map · Likely 2026 Voter</span><span class="rlabel" style="color:var(--fg-dim);">${recs.length} towns · ${fmt(likely)} total · click to inspect</span></div>
+      <div class="console-body" style="display:grid;grid-template-columns:1.6fr 1fr;">
+        <div class="amap-wrap" style="position:relative;border-right:1px solid var(--border);">
+          <div id="tu-map" style="height:520px;border:0;border-radius:0;background:#0C1A2E;"></div>
         </div>
-        <div style="font-family:var(--ff-body);font-size:12px;color:var(--fg-muted);margin-bottom:8px;">A voter enters the Likely 2026 Voter universe if any of the following hold:</div>
-        ${crit("var(--teal-lt)", [
-          "Voted in 2022 <b>and</b> at least one other recent election",
-          "Voted in the last two general elections",
-          "Voted in 3 of 4 or 4 of 4 recent generals",
-          "New mover or new registrant who has already voted",
-        ])}
+        <div style="padding:18px;">
+          <div id="tu-sel" style="background:rgba(15,33,64,.6);border:1px solid var(--border-strong);border-radius:8px;padding:16px 18px;margin-bottom:16px;"></div>
+          <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;">
+            <span class="rlabel">Town Rank</span><span class="rlabel" style="color:var(--teal-lt);">Likely 2026 Voter</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;">${rankRows}</div>
+        </div>
       </div>
-      <div class="vcard" style="padding:20px 22px;">
-        <div class="rlabel" style="margin-bottom:16px;">Likely 2026 Voter by Town<span class="rlabel" style="color:var(--fg-dim);margin-left:8px;">${townRows.length} towns · ${fmt(likely)} total</span></div>
-        <div style="display:flex;flex-direction:column;gap:15px;">
-          ${townRows.map(t => `<div>
-            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
-              <span class="r-num" style="font-size:15px;color:var(--fg);">${t.town}</span>
-              <span><span class="r-num" style="font-size:15px;color:var(--teal-lt);">${fmt(t.likely)}</span> <span class="r-num" style="font-size:12px;color:var(--fg-muted);">${pc1(100 * t.likely / likely)}</span></span>
-            </div>
-            <div style="height:8px;border-radius:4px;background:rgba(255,255,255,.06);overflow:hidden;"><div style="height:100%;width:${100 * t.likely / lmax}%;background:var(--teal-lt);border-radius:4px;"></div></div>
-          </div>`).join("")}
-        </div>
+    </div>
+
+    <div class="vcard" style="padding:20px 22px;margin-bottom:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">
+        <span class="rlabel">Who Qualifies as a Likely 2026 Voter</span>
+        <span class="rlabel" style="color:var(--fg-dim);">enters if any hold</span>
+      </div>
+      <div class="wpanel" style="grid-template-columns:1fr 1fr;gap:0 28px;">
+        <div>${crit("var(--teal-lt)", ["Voted in 2022 <b>and</b> at least one other recent election", "Voted in the last two general elections"])}</div>
+        <div>${crit("var(--teal-lt)", ["Voted in 3 of 4 or 4 of 4 recent generals", "New mover or new registrant who has already voted"])}</div>
       </div>
     </div>
 
@@ -1015,7 +1041,52 @@ ROUTES.targets = function (view) {
     </div>
 
     <div class="vbanner" style="margin-top:16px;"><span class="tag" style="font-size:10px;color:var(--gold);">Model</span><span class="kicker" style="text-transform:none;letter-spacing:0;font-family:var(--ff-body);font-size:10.5px;">Likely 2026 Voter is the planning universe. Turnout Lift is a separate GOTV pool and is not part of it.</span></div>`;
+
+  paintTargetSel();
+  view.querySelectorAll("[data-ttown]").forEach(eln => {
+    const go = () => selectTargetTown(eln.dataset.ttown);
+    eln.onclick = go;
+    eln.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } };
+  });
+  setTimeout(() => targetUnivMap(recs, byName), 30);
 };
+
+/* Likely 2026 Voter district map — towns shaded by likely-voter count, click to inspect */
+function targetUnivMap(recs, byName) {
+  const host = document.getElementById("tu-map");
+  if (!host || !GEO || !GEO.towns) return;
+  const vals = recs.map(r => r.likely), lo = Math.min(...vals), hi = Math.max(...vals);
+  const map = L.map("tu-map", { scrollWheelZoom: false, zoomControl: false, attributionControl: false,
+    dragging: false, doubleClickZoom: false, boxZoom: false, keyboard: false, touchZoom: false });
+  const byLayer = {};
+  const styleFor = name => { const r = byName[name]; const sel = name === targetSel;
+    return { fillColor: r ? regColor(r.likely, lo, hi) : "#25313f", fillOpacity: .95,
+      color: sel ? "#F0B82A" : "rgba(255,255,255,.16)", weight: sel ? 2.5 : 1 }; };
+  const applyOne = name => { if (byLayer[name]) byLayer[name].setStyle(styleFor(name)); };
+  tuApplyStyles = () => Object.keys(byLayer).forEach(applyOne);
+  const layer = L.geoJSON(GEO.towns, {
+    style: f => styleFor(f.properties.town),
+    onEachFeature: (f, lyr) => {
+      const name = f.properties.town; if (!byName[name]) return;
+      byLayer[name] = lyr;
+      lyr.on({
+        click: () => selectTargetTown(name),
+        mouseover: e => { if (name !== targetSel) e.target.setStyle({ color: "rgba(255,255,255,.5)", weight: 1.5 }); },
+        mouseout: () => applyOne(name),
+      });
+    }
+  }).addTo(map);
+  map.fitBounds(layer.getBounds(), { padding: [40, 40] });
+  (window._maps = window._maps || []).push(map);
+  GEO.towns.features.forEach(f => {
+    const name = f.properties.town, r = byName[name]; if (!byLayer[name] || !r) return;
+    const c = byLayer[name].getBounds().getCenter();
+    L.tooltip({ permanent: true, direction: "center", className: "v-town-lbl", opacity: 1 })
+      .setLatLng(c)
+      .setContent(`<div style="text-align:center;pointer-events:none;text-shadow:0 2px 10px rgba(0,0,0,.7)"><div style="font-family:var(--ff-display);font-weight:800;font-size:17px;letter-spacing:1px;text-transform:uppercase;color:#fff;line-height:1">${name}</div><div style="font-family:var(--ff-cond);font-weight:700;font-size:15px;color:rgba(255,255,255,.9);margin-top:3px;font-variant-numeric:tabular-nums">${fmt(r.likely)}</div></div>`)
+      .addTo(map);
+  });
+}
 
 /* ───────────────── BATTLEFIELD ───────────────── */
 let battleSel = 0;
