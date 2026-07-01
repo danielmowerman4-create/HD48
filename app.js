@@ -39,6 +39,10 @@ const NAV = [
 ];
 function buildNav() {
   const n = $("#nav");
+  // Overview = the standalone command front page (full-page link, not a hash route)
+  const ov = el("a", "tab"); ov.href = "overview.html";
+  ov.innerHTML = `<span class="tab-pip"></span>Overview`;
+  n.appendChild(ov);
   NAV.forEach(([id, lab]) => {
     const t = el("a", "tab"); t.dataset.route = id; t.href = "#" + id;
     t.innerHTML = `<span class="tab-pip"></span>${lab}`;
